@@ -44,6 +44,7 @@ class MindMapResult(TypedDict):
     title: str
     root_name: str
     children_count: int
+    mind_map_json: str
     message: str
 
 
@@ -383,6 +384,7 @@ def _create_mind_map(
         title=save_result.get("title", title),
         root_name=root_name,
         children_count=children_count,
+        mind_map_json=save_result.get("mind_map_json", "{}"),
         message="Mind map created successfully.",
     )
 

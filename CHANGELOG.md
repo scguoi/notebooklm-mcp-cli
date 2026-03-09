@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.4.4] - 2026-03-08
+
+### Fixed
+- **Complex citation parsing (PR #84)** — Fixed `notebook_query` dropping cited text when Google returns "direct" citation segments (integer-first elements) alongside the standard "wrapped" format. Both segment variants are now correctly handled. Thanks to **@meirtsvi** for this contribution!
+- **Table citation extraction (PR #84)** — When a citation references a data table, the response now includes a structured `cited_table` field with `num_columns` and `rows` data. Table segments are indicated by a `<cited_table>` placeholder in the `cited_text` field.
+- **Mind map JSON missing from MCP response (Issue #83)** — `studio_create` for mind maps was returning metadata (`root_name`, `children_count`) but dropping the actual `mind_map_json`. The full JSON now flows through to MCP clients. Thanks to **@cowhi** for reporting!
+
+### Added
+- **17 new unit tests** for citation parsing — Comprehensive test coverage for direct/wrapped segment detection, table placeholder insertion, `_extract_text_from_table_rows`, `_extract_table_from_detail`, and `cited_table` in `_extract_citation_data`. Total tests: 503.
+
 ## [0.4.3] - 2026-03-08
 
 ### Removed

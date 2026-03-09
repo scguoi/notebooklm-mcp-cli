@@ -404,3 +404,278 @@ class TestCitationExtraction:
         """_extract_citation_data handles type_info shorter than 4 elements."""
         result = ConversationMixin._extract_citation_data([1])
         assert result == {}
+
+
+class TestCitedTextParsing:
+    """Test _extract_cited_text with direct segments, wrapped segments, and tables."""
+
+    def test_wrapped_segments_extract_text(self):
+        """Wrapped segments [[seg], ...] extract text correctly (original format)."""
+        detail = [
+            None, None, 0.75, None,
+            [
+                [[0, 50, [[[0, 50, ["Hello world."]]]]]],
+            ],
+        ]
+        result = ConversationMixin._extract_cited_text(detail)
+        assert result == "Hello world."
+
+    def test_direct_segments_extract_text(self):
+        """Direct segments [int, int, nested] extract text correctly (PR #84 fix)."""
+        detail = [
+            None, None, 0.75, None,
+            [
+                [0, 100, [[[0, 100, ["Direct segment text."]]]]]
+            ],
+        ]
+        result = ConversationMixin._extract_cited_text(detail)
+        assert result == "Direct segment text."
+
+    def test_mixed_direct_and_wrapped_segments(self):
+        """Both direct and wrapped segments are extracted together."""
+        detail = [
+            None, None, 0.75, None,
+            [
+                # Wrapped segment
+                [[0, 30, [[[0, 30, ["Wrapped text."]]]]]],
+                # Direct segment
+                [31, 60, [[[31, 60, ["Direct text."]]]]],
+            ],
+        ]
+        result = ConversationMixin._extract_cited_text(detail)
+        assert result == "Wrapped text. Direct text."
+
+    def test_table_segment_inserts_placeholder(self):
+        """Table segments (nested=null, data at segment[4]) insert <cited_table>."""
+        # Table segment: [start, end, null, null, [dim1, dim2, rows_array]]
+        # Use minimal but valid rows so the table detection triggers
+        cell_a = [0, 10, [[0, 1, [[[[0, 1, ["A"]], None]]]]]]
+        cell_b = [11, 20, [[0, 1, [[[[0, 1, ["B"]], None]]]]]]
+        table_rows = [[0, 50, [cell_a, cell_b]]]
+        detail = [
+            None, None, 0.75, None,
+            [
+                [0, 100, None, None, [2, 1, table_rows]],
+            ],
+        ]
+        result = ConversationMixin._extract_cited_text(detail)
+        assert result == "<cited_table>"
+
+    def test_text_and_table_segments_combined(self):
+        """Text followed by table produces text with placeholder."""
+        cell_x = [0, 10, [[0, 1, [[[[0, 1, ["X"]], None]]]]]]
+        cell_y = [11, 20, [[0, 1, [[[[0, 1, ["Y"]], None]]]]]]
+        table_rows = [[0, 50, [cell_x, cell_y]]]
+        detail = [
+            None, None, 0.75, None,
+            [
+                [0, 30, [[[0, 30, ["Some intro text."]]]]],
+                [31, 100, None, None, [2, 1, table_rows]],
+            ],
+        ]
+        result = ConversationMixin._extract_cited_text(detail)
+        assert result == "Some intro text. <cited_table>"
+
+    def test_detail_too_short_returns_none(self):
+        """detail with fewer than 5 elements returns None."""
+        assert ConversationMixin._extract_cited_text([None, None, 0.75, None]) is None
+
+    def test_detail_index_4_not_list_returns_none(self):
+        """detail[4] being non-list returns None."""
+        assert ConversationMixin._extract_cited_text(
+            [None, None, 0.75, None, "not a list"]
+        ) is None
+
+    def test_empty_elements_returns_none(self):
+        """Empty elements in detail[4] are skipped, returns None."""
+        detail = [None, None, 0.75, None, [[], None, "string"]]
+        assert ConversationMixin._extract_cited_text(detail) is None
+
+
+class TestTableRowParsing:
+    """Test _extract_text_from_table_rows for structured table extraction."""
+
+    @staticmethod
+    def _make_cell(text: str) -> list:
+        """Build a single table cell matching _extract_text_from_table_rows format.
+
+        Structure: [start, end, [[sub_start, sub_end, [content_item]]]]
+        content_item: [[text_start, text_end, text_val]]
+        """
+        return [0, 10, [
+            [0, len(text), [
+                [[0, len(text), text]]
+            ]]
+        ]]
+
+    @staticmethod
+    def _make_row(start: int, end: int, cells: list) -> list:
+        """Build a table row."""
+        return [start, end, cells]
+
+    def test_simple_table(self):
+        """Parse a simple 2x2 table."""
+        rows = [
+            self._make_row(0, 50, [self._make_cell("Header1"), self._make_cell("Header2")]),
+            self._make_row(51, 100, [self._make_cell("Val1"), self._make_cell("Val2")]),
+        ]
+        result = ConversationMixin._extract_text_from_table_rows(rows)
+        assert len(result) == 2
+        assert result[0] == ["Header1", "Header2"]
+        assert result[1] == ["Val1", "Val2"]
+
+    def test_empty_rows_skipped(self):
+        """Rows that are too short are skipped."""
+        rows = [[0, 10], "not a list"]
+        result = ConversationMixin._extract_text_from_table_rows(rows)
+        assert result == []
+
+    def test_empty_cells(self):
+        """Empty cells (short lists) produce empty strings."""
+        rows = [
+            self._make_row(0, 50, [
+                [0, 25],  # empty cell (no third element)
+                self._make_cell("Data"),
+            ]),
+        ]
+        result = ConversationMixin._extract_text_from_table_rows(rows)
+        assert len(result) == 1
+        assert result[0] == ["", "Data"]
+
+
+class TestTableFromDetail:
+    """Test _extract_table_from_detail for extracting structured table data."""
+
+    @staticmethod
+    def _make_cell(text: str) -> list:
+        """Build a single table cell matching _extract_text_from_table_rows format.
+
+        Structure: [start, end, [[sub_start, sub_end, [content_item]]]]
+        content_item: [[text_start, text_end, text_val]]
+        """
+        return [0, 10, [
+            [0, len(text), [
+                [[0, len(text), text]]
+            ]]
+        ]]
+
+    def test_extracts_table_from_detail(self):
+        """Table segment in detail[4] is extracted with num_columns and rows."""
+        table_rows = [
+            [0, 50, [self._make_cell("Col1"), self._make_cell("Col2")]],
+        ]
+        detail = [
+            None, None, 0.75, None,
+            [
+                [0, 100, None, None, [2, 1, table_rows]],
+            ],
+            [["source-id"], "hash"],
+        ]
+        result = ConversationMixin._extract_table_from_detail(detail)
+        assert result is not None
+        assert result["num_columns"] == 2
+        assert result["rows"] == [["Col1", "Col2"]]
+
+    def test_returns_none_for_text_only_detail(self):
+        """detail with only text segments (no tables) returns None."""
+        detail = [
+            None, None, 0.75, None,
+            [
+                [[0, 50, [[[0, 50, ["Just text."]]]]]],
+            ],
+            [["source-id"], "hash"],
+        ]
+        result = ConversationMixin._extract_table_from_detail(detail)
+        assert result is None
+
+    def test_returns_none_for_short_detail(self):
+        """detail shorter than 5 elements returns None."""
+        assert ConversationMixin._extract_table_from_detail([None, None]) is None
+
+    def test_returns_none_for_non_list_index_4(self):
+        """detail[4] being non-list returns None."""
+        assert ConversationMixin._extract_table_from_detail(
+            [None, None, 0.75, None, "not_a_list"]
+        ) is None
+
+
+class TestCitationDataWithTable:
+    """Test _extract_citation_data includes cited_table when table is present."""
+
+    @staticmethod
+    def _make_cell(text: str) -> list:
+        """Build a single table cell matching _extract_text_from_table_rows format.
+
+        Structure: [start, end, [[sub_start, sub_end, [content_item]]]]
+        content_item: [[text_start, text_end, text_val]]
+        """
+        return [0, 10, [
+            [0, len(text), [
+                [[0, len(text), text]]
+            ]]
+        ]]
+
+    @classmethod
+    def _build_passage_with_table(
+        cls, passage_id: str, source_id: str, cell_texts: list[list[str]]
+    ) -> list:
+        """Build a passage entry that contains a table segment."""
+        table_rows = []
+        offset = 0
+        for row_texts in cell_texts:
+            cells = [cls._make_cell(t) for t in row_texts]
+            table_rows.append([offset, offset + 50, cells])
+            offset += 51
+        return [
+            [passage_id],
+            [
+                None, None, 0.75,
+                [[None, 0, 500]],
+                [
+                    [0, 200, None, None, [len(cell_texts[0]), len(cell_texts), table_rows]],
+                ],
+                [[[source_id], "hash"]],
+                [passage_id],
+            ],
+        ]
+
+    def test_citation_data_includes_cited_table(self):
+        """References include cited_table when passage has table data."""
+        passages = [
+            self._build_passage_with_table("p1", "src-1", [["A", "B"]]),
+        ]
+        type_info = [None, None, None, passages, 1]
+
+        result = ConversationMixin._extract_citation_data(type_info)
+
+        assert result["sources_used"] == ["src-1"]
+        assert len(result["references"]) == 1
+        ref = result["references"][0]
+        assert ref["source_id"] == "src-1"
+        assert "cited_table" in ref
+        assert ref["cited_table"]["num_columns"] == 2
+        assert ref["cited_table"]["rows"] == [["A", "B"]]
+
+    def test_citation_data_without_table_has_no_cited_table(self):
+        """References without tables do not include cited_table key."""
+        passages = [
+            [
+                ["pass-1"],
+                [
+                    None, None, 0.75,
+                    [[None, 0, 500]],
+                    [[[0, 500, [[[0, 500, ["Normal text."]]]]]]],
+                    [[["src-1"], "hash"]],
+                    ["pass-1"],
+                ],
+            ],
+        ]
+        type_info = [None, None, None, passages, 1]
+
+        result = ConversationMixin._extract_citation_data(type_info)
+
+        assert result["sources_used"] == ["src-1"]
+        ref = result["references"][0]
+        assert "cited_table" not in ref
+        assert ref.get("cited_text") == "Normal text."
+
