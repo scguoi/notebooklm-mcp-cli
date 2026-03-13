@@ -61,7 +61,7 @@ For complete command reference, troubleshooting, and workflows, install the full
 uv tool install notebooklm-mcp-cli
 
 # Then install/update skill for your AI tool
-nlm skill install <tool>  # Install (claude-code, opencode, gemini-cli, etc)
+nlm skill install <tool>  # Install (claude-code, agents, opencode, etc)
 nlm skill update <tool>   # Update existing skill
 ```
 

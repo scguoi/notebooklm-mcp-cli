@@ -675,11 +675,10 @@ nlm skill show                              # Display skill content
 - `claude-code` - Claude Code CLI and Desktop (`~/.claude/skills/nlm-skill/`)
 - `cursor` - Cursor AI editor (`~/.cursor/skills/nlm-skill/`)
 - `opencode` - OpenCode AI assistant (`~/.config/opencode/skills/nlm-skill/`)
-- `gemini-cli` - Google Gemini CLI (`~/.gemini/skills/nlm-skill/`)
+- `agents` - Generic agent skill for Gemini CLI, Codex, and others (`~/.agents/skills/nlm-skill/`)
 - `antigravity` - Antigravity agent framework (`~/.gemini/antigravity/skills/nlm-skill/`)
 - `cline` - Cline CLI terminal agent (`~/.cline/skills/nlm-skill/`)
 - `openclaw` - OpenClaw AI agent framework (`~/.openclaw/workspace/skills/nlm-skill/`)
-- `codex` - Codex AI assistant (`~/.agents/skills/nlm-skill/`)
 - `other` - Export all formats to `./nlm-skill-export/` for manual installation
 
 **Installation Levels:**
@@ -691,8 +690,8 @@ nlm skill show                              # Display skill content
 # Install for Claude Code at user level
 nlm skill install claude-code
 
-# Install for Codex at project level
-nlm skill install codex --level project
+# Install for Codex/Gemini CLI at project level
+nlm skill install agents --level project
 
 # Check what's installed
 nlm skill list
@@ -709,7 +708,7 @@ nlm skill show | head -50
 - `SKILL.md` - Main skill file with NotebookLM CLI/MCP documentation
 - `references/` - Additional documentation (command_reference.md, troubleshooting.md, workflows.md)
 
-For Codex, it installs to `~/.agents/skills/nlm-skill/SKILL.md` per official Codex docs.
+For Gemini CLI (v0.33.1+) and Codex, it installs to `~/.agents/skills/nlm-skill/SKILL.md` — the cross-tool compatible path.
 
 **Note:** If the parent directory doesn't exist (e.g., `~/.claude/` for Claude Code), the installer will prompt you to either create it, switch to project-level installation, or cancel.
 
@@ -719,7 +718,7 @@ nlm install skill claude-code              # Same as: nlm skill install claude-c
 nlm install skill cursor --level project  # Install for Cursor at project level
 nlm update skill                           # Same as: nlm skill update
 nlm update skill claude-code               # Same as: nlm skill update claude-code
-nlm uninstall skill gemini-cli             # Same as: nlm skill uninstall gemini-cli
+nlm uninstall skill agents             # Same as: nlm skill uninstall agents
 nlm list skills                            # Same as: nlm skill list
 nlm show skill                             # Same as: nlm skill show
 ```

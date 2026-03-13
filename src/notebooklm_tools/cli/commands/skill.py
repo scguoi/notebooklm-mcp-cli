@@ -32,11 +32,11 @@ TOOL_CONFIGS = {
         "format": "skill.md",
         "description": "Cursor AI editor",
     },
-    "codex": {
+    "agents": {
         "user": Path.home() / ".agents/skills/nlm-skill",
         "project": Path(".agents/skills/nlm-skill"),
         "format": "skill.md",
-        "description": "OpenAI Codex CLI",
+        "description": "Generic agent skill (Gemini CLI, Codex, and others)",
     },
     "opencode": {
         "user": Path.home() / ".config/opencode/skills/nlm-skill",
@@ -44,15 +44,9 @@ TOOL_CONFIGS = {
         "format": "skill.md",
         "description": "OpenCode AI assistant",
     },
-    "gemini-cli": {
-        "user": Path.home() / ".gemini/skills/nlm-skill",
-        "project": Path(".gemini/skills/nlm-skill"),
-        "format": "skill.md",
-        "description": "Google Gemini CLI",
-    },
     "antigravity": {
         "user": Path.home() / ".gemini/antigravity/skills/nlm-skill",
-        "project": Path(".agent/skills/nlm-skill"),
+        "project": Path(".agents/skills/nlm-skill"),
         "format": "skill.md",
         "description": "Antigravity agent framework",
     },
@@ -310,13 +304,13 @@ This directory contains NotebookLM skill files in multiple formats.
 ## Formats Available
 
 ### nlm-skill/
-- `SKILL.md` - Main skill file for Claude Code, OpenCode, Gemini CLI, Antigravity
+- `SKILL.md` - Main skill file for Claude Code, OpenCode, Gemini CLI, Antigravity, Codex
 - `references/` - Additional reference documentation
 
 This is the standard skill directory structure used by all automated installations.
 
 ### AGENTS_SECTION.md
-- Section format for Codex AGENTS.md (copy/paste into your AGENTS.md)
+- Section format for AGENTS.md (copy/paste into your AGENTS.md)
 
 ## Installation
 
@@ -330,9 +324,9 @@ cp -r nlm-skill ~/.claude/skills/
 cp -r nlm-skill ~/.config/opencode/skills/
 ```
 
-### Gemini CLI
+### Gemini CLI / Codex / Agents (cross-tool compatible)
 ```bash
-cp -r nlm-skill ~/.gemini/skills/
+cp -r nlm-skill ~/.agents/skills/
 ```
 
 ### Antigravity
@@ -343,13 +337,8 @@ cp -r nlm-skill ~/.gemini/antigravity/skills/
 Or for project-level installation, copy to:
 - Claude Code: `.claude/skills/`
 - OpenCode: `.opencode/skills/`
-- Gemini CLI: `.gemini/skills/`
-- Antigravity: `.agent/skills/`
-
-### Codex
-```bash
-cp -r nlm-skill ~/.agents/skills/
-```
+- Gemini CLI / Codex: `.agents/skills/`
+- Antigravity: `.agents/skills/`
 
 ## Automated Installation
 
@@ -358,13 +347,16 @@ Instead of manual copying, you can use:
 nlm skill install <tool>
 ```
 
-Where `<tool>` is: claude-code, cursor, codex, opencode, gemini-cli, antigravity, cline, openclaw.
+Where `<tool>` is: claude-code, cursor, agents, opencode, antigravity, cline, openclaw.
+
+> **Note:** `agents` replaces the old `gemini-cli` and `codex` entries. The `.agents/skills/`
+> path is the cross-tool compatible alias supported by Gemini CLI (v0.33.1+), Codex, and others.
 """
 
     (install_path / "README.md").write_text(readme_content, encoding="utf-8")
 
     console.print(f"[green]✓[/green] Exported all formats to {install_path}")
-    console.print(f"  [dim]• nlm-skill/ (skill directory for Claude Code, OpenCode, Gemini, Antigravity)")
+    console.print(f"  [dim]• nlm-skill/ (skill directory for Claude Code, OpenCode, Agents, Antigravity)")
     console.print(f"  [dim]• AGENTS_SECTION.md (for Codex)")
     console.print(f"  [dim]• README.md (installation instructions)")
 
@@ -373,7 +365,7 @@ Where `<tool>` is: claude-code, cursor, codex, opencode, gemini-cli, antigravity
 def install(
     tool: str = typer.Argument(
         ...,
-        help="Tool to install skill for (claude-code, cursor, codex, opencode, gemini-cli, antigravity, other)",
+        help="Tool to install skill for (claude-code, cursor, agents, opencode, antigravity, other)",
         shell_complete=complete_tool_name,
     ),
     level: Literal["user", "project"] = typer.Option(
@@ -388,7 +380,7 @@ def install(
 
     Examples:
         nlm skill install claude-code
-        nlm skill install codex --level project
+        nlm skill install agents --level project
         nlm skill install other  # Export all formats
     """
     if tool not in TOOL_CONFIGS:

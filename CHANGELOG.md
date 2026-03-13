@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.6] - 2026-03-12
 
+### Changed
+- **Skill path migration: `.gemini/skills/` → `.agents/skills/`** — Starting with Gemini CLI v0.33.1, `.agents/skills/` is the recommended cross-tool compatible path (higher priority than `.gemini/skills/`). `nlm skill install gemini-cli` and `nlm skill install codex` are replaced by `nlm skill install agents`, which installs to `~/.agents/skills/nlm-skill/`. This path works for Gemini CLI, Codex, and any tool that reads `.agents/skills/`. Users with existing `gemini-cli` or `codex` installations should run `nlm skill install agents` to reinstall at the new location.
+
 ### Added
 - **Batch Operations** — Perform actions across multiple notebooks at once. Thanks to **@fabianafurtadoff** for this contribution (PR #90)!
   - `nlm batch query` — Query multiple notebooks with the same question
