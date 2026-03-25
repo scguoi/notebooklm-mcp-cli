@@ -1,19 +1,17 @@
 """Tests for pipeline service — multi-step workflow automation."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from notebooklm_tools.services.pipeline import (
-    pipeline_run,
-    pipeline_list,
-    pipeline_create,
-    _substitute_vars,
-    _load_pipeline,
-    BUILTIN_PIPELINES,
-)
 from notebooklm_tools.services.errors import ValidationError
+from notebooklm_tools.services.pipeline import (
+    _load_pipeline,
+    _substitute_vars,
+    pipeline_create,
+    pipeline_list,
+    pipeline_run,
+)
 
 
 @pytest.fixture
@@ -57,6 +55,7 @@ class TestLoadPipeline:
 
     def test_load_user_defined(self, pipelines_dir):
         import yaml
+
         pipeline_def = {
             "name": "custom",
             "description": "Custom pipeline",
@@ -85,13 +84,18 @@ class TestPipelineList:
 
     def test_list_includes_user_defined(self, pipelines_dir):
         import yaml
+
         pipeline_dir = pipelines_dir / "pipelines"
         pipeline_dir.mkdir(parents=True, exist_ok=True)
-        (pipeline_dir / "my-pipeline.yaml").write_text(yaml.dump({
-            "name": "my-pipeline",
-            "description": "My custom pipeline",
-            "steps": [{"action": "notebook_query", "params": {"query": "test"}}],
-        }))
+        (pipeline_dir / "my-pipeline.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": "my-pipeline",
+                    "description": "My custom pipeline",
+                    "steps": [{"action": "notebook_query", "params": {"query": "test"}}],
+                }
+            )
+        )
 
         result = pipeline_list()
         names = [p["name"] for p in result]
@@ -136,12 +140,17 @@ class TestPipelineRun:
 
         # Create a simple user pipeline
         import yaml
+
         pipeline_dir = pipelines_dir / "pipelines"
         pipeline_dir.mkdir(parents=True, exist_ok=True)
-        (pipeline_dir / "simple.yaml").write_text(yaml.dump({
-            "name": "simple",
-            "steps": [{"action": "notebook_query", "params": {"query": "test"}}],
-        }))
+        (pipeline_dir / "simple.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": "simple",
+                    "steps": [{"action": "notebook_query", "params": {"query": "test"}}],
+                }
+            )
+        )
 
         result = pipeline_run(mock_client, "nb-001", "simple")
         assert result["pipeline_name"] == "simple"
@@ -157,15 +166,20 @@ class TestPipelineRun:
         mock_chat.query.side_effect = Exception("API error")
 
         import yaml
+
         pipeline_dir = pipelines_dir / "pipelines"
         pipeline_dir.mkdir(parents=True, exist_ok=True)
-        (pipeline_dir / "two-step.yaml").write_text(yaml.dump({
-            "name": "two-step",
-            "steps": [
-                {"action": "notebook_query", "params": {"query": "step1"}},
-                {"action": "notebook_query", "params": {"query": "step2"}},
-            ],
-        }))
+        (pipeline_dir / "two-step.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": "two-step",
+                    "steps": [
+                        {"action": "notebook_query", "params": {"query": "step1"}},
+                        {"action": "notebook_query", "params": {"query": "step2"}},
+                    ],
+                }
+            )
+        )
 
         result = pipeline_run(mock_client, "nb-001", "two-step")
         assert result["failed"] == 1
@@ -177,12 +191,17 @@ class TestPipelineRun:
         mock_notebooks.delete_notebook.return_value = {"deleted": True}
 
         import yaml
+
         pipeline_dir = pipelines_dir / "pipelines"
         pipeline_dir.mkdir(parents=True, exist_ok=True)
-        (pipeline_dir / "delete-test.yaml").write_text(yaml.dump({
-            "name": "delete-test",
-            "steps": [{"action": "notebook_delete", "params": {}}],
-        }))
+        (pipeline_dir / "delete-test.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": "delete-test",
+                    "steps": [{"action": "notebook_delete", "params": {}}],
+                }
+            )
+        )
 
         result = pipeline_run(mock_client, "nb-001", "delete-test")
         assert result["succeeded"] == 1
@@ -193,15 +212,22 @@ class TestPipelineRun:
         mock_chat.query.return_value = {"answer": "OK", "conversation_id": None, "sources_used": []}
 
         import yaml
+
         pipeline_dir = pipelines_dir / "pipelines"
         pipeline_dir.mkdir(parents=True, exist_ok=True)
-        (pipeline_dir / "var-test.yaml").write_text(yaml.dump({
-            "name": "var-test",
-            "steps": [{"action": "notebook_query", "params": {"query": "$MY_QUERY"}}],
-        }))
+        (pipeline_dir / "var-test.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": "var-test",
+                    "steps": [{"action": "notebook_query", "params": {"query": "$MY_QUERY"}}],
+                }
+            )
+        )
 
         result = pipeline_run(
-            mock_client, "nb-001", "var-test",
+            mock_client,
+            "nb-001",
+            "var-test",
             variables={"MY_QUERY": "What is AI?"},
         )
         assert result["succeeded"] == 1

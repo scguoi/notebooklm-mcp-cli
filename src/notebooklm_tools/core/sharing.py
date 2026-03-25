@@ -7,14 +7,14 @@ This mixin provides sharing-related operations:
 - add_collaborators_bulk: Add multiple collaborators in a single API call
 """
 
-from .base import BaseClient
 from . import constants
-from .data_types import ShareStatus, Collaborator
+from .base import BaseClient
+from .data_types import Collaborator, ShareStatus
 
 
 class SharingMixin(BaseClient):
     """Mixin for notebook sharing and collaboration operations.
-    
+
     This class inherits from BaseClient and provides all sharing-related
     operations. It is designed to be composed with other mixins via
     multiple inheritance in the final NotebookLMClient class.
@@ -47,27 +47,34 @@ class SharingMixin(BaseClient):
                             # Collaborator format: [email, role_code, [], [name, avatar_url]]
                             email = entry[0] if entry[0] else None
                             if email and isinstance(email, str) and "@" in email:
-                                role_code = entry[1] if len(entry) > 1 and isinstance(entry[1], int) else 3
+                                role_code = (
+                                    entry[1] if len(entry) > 1 and isinstance(entry[1], int) else 3
+                                )
                                 role = constants.SHARE_ROLES.get_name(role_code)
                                 # Name is in entry[3][0] if present
                                 display_name = None
-                                if len(entry) > 3 and isinstance(entry[3], list) and len(entry[3]) > 0:
+                                if (
+                                    len(entry) > 3
+                                    and isinstance(entry[3], list)
+                                    and len(entry[3]) > 0
+                                ):
                                     display_name = entry[3][0]
                                 # Pending invites may have additional flag
                                 is_pending = len(entry) > 4 and entry[4] is True
-                                collaborators.append(Collaborator(
-                                    email=email,
-                                    role=role,
-                                    is_pending=is_pending,
-                                    display_name=str(display_name) if display_name else None,
-                                ))
-
+                                collaborators.append(
+                                    Collaborator(
+                                        email=email,
+                                        role=role,
+                                        is_pending=is_pending,
+                                        display_name=str(display_name) if display_name else None,
+                                    )
+                                )
 
             # Check for public access flag
             # Usually indicated by access level code in the response
             # Position varies; look for [1] pattern indicating public
             for item in result:
-                if isinstance(item, list) and len(item) >= 1:
+                if isinstance(item, list) and len(item) >= 1:  # noqa: SIM102
                     if item[0] == 1:  # Public access indicator
                         is_public = True
                         break
@@ -99,14 +106,9 @@ class SharingMixin(BaseClient):
         # access_level: 0 = restricted, 1 = public
         access_code = self.SHARE_ACCESS_PUBLIC if is_public else self.SHARE_ACCESS_RESTRICTED
 
-        params = [
-            [[notebook_id, None, [access_code], [0, ""]]],
-            1,
-            None,
-            [2]
-        ]
+        params = [[[notebook_id, None, [access_code], [0, ""]]], 1, None, [2]]
 
-        result = self._call_rpc(self.RPC_SHARE_NOTEBOOK, params)
+        self._call_rpc(self.RPC_SHARE_NOTEBOOK, params)
 
         if is_public:
             return f"https://notebooklm.google.com/notebook/{notebook_id}"
@@ -144,7 +146,7 @@ class SharingMixin(BaseClient):
             [[notebook_id, [[email, None, role_code]], None, [notify_flag, message]]],
             1,
             None,
-            [2]
+            [2],
         ]
 
         result = self._call_rpc(self.RPC_SHARE_NOTEBOOK, params)
@@ -189,12 +191,7 @@ class SharingMixin(BaseClient):
 
         notify_flag = 0 if notify else 1  # 0 = notify, 1 = don't notify
 
-        params = [
-            [[notebook_id, email_items, None, [notify_flag, message]]],
-            1,
-            None,
-            [2]
-        ]
+        params = [[[notebook_id, email_items, None, [notify_flag, message]]], 1, None, [2]]
 
         result = self._call_rpc(self.RPC_SHARE_NOTEBOOK, params)
 

@@ -1,10 +1,10 @@
 """Chat service — shared business logic for notebook querying and chat configuration."""
 
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 from ..core.client import NotebookLMClient
 from ..core.conversation import QueryRejectedError
-from .errors import ValidationError, ServiceError
+from .errors import ServiceError, ValidationError
 
 VALID_GOALS = ("default", "learning_guide", "custom")
 VALID_RESPONSE_LENGTHS = ("default", "longer", "shorter")
@@ -13,8 +13,9 @@ MAX_PROMPT_LENGTH = 10_000
 
 class QueryResult(TypedDict):
     """Result of a notebook query."""
+
     answer: str
-    conversation_id: Optional[str]
+    conversation_id: str | None
     sources_used: list
     citations: dict
     references: list
@@ -22,6 +23,7 @@ class QueryResult(TypedDict):
 
 class ConfigureResult(TypedDict):
     """Result of configuring chat settings."""
+
     notebook_id: str
     goal: str
     response_length: str
@@ -32,9 +34,9 @@ def query(
     client: NotebookLMClient,
     notebook_id: str,
     query_text: str,
-    source_ids: Optional[list[str]] = None,
-    conversation_id: Optional[str] = None,
-    timeout: Optional[float] = None,
+    source_ids: list[str] | None = None,
+    conversation_id: str | None = None,
+    timeout: float | None = None,
 ) -> QueryResult:
     """Query a notebook's sources with AI.
 
@@ -75,9 +77,9 @@ def query(
                 "programmatic access. Try re-authenticating with 'nlm login' "
                 "or using a different account."
             ),
-        )
+        ) from e
     except Exception as e:
-        raise ServiceError(f"Query failed: {e}")
+        raise ServiceError(f"Query failed: {e}") from e
 
     if result:
         return {
@@ -98,7 +100,7 @@ def configure_chat(
     client: NotebookLMClient,
     notebook_id: str,
     goal: str = "default",
-    custom_prompt: Optional[str] = None,
+    custom_prompt: str | None = None,
     response_length: str = "default",
 ) -> ConfigureResult:
     """Configure notebook chat settings.
@@ -147,7 +149,7 @@ def configure_chat(
             response_length=response_length,
         )
     except Exception as e:
-        raise ServiceError(f"Failed to configure chat: {e}")
+        raise ServiceError(f"Failed to configure chat: {e}") from e
 
     if result:
         return {
@@ -165,6 +167,7 @@ def configure_chat(
 
 class DeleteChatHistoryResult(TypedDict):
     """Result of deleting chat history."""
+
     notebook_id: str
     message: str
 
@@ -198,7 +201,7 @@ def delete_chat_history(
     try:
         client.delete_chat_history(notebook_id, conv_id)
     except Exception as e:
-        raise ServiceError(f"Failed to delete chat history: {e}")
+        raise ServiceError(f"Failed to delete chat history: {e}") from e
 
     return {
         "notebook_id": notebook_id,

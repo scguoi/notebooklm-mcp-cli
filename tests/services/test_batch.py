@@ -5,10 +5,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from notebooklm_tools.services.batch import (
-    batch_query,
     batch_add_source,
     batch_create,
     batch_delete,
+    batch_query,
     batch_studio,
 )
 from notebooklm_tools.services.errors import ValidationError
@@ -19,8 +19,28 @@ def mock_client():
     """Create a mock NotebookLMClient."""
     client = MagicMock()
     client.list_notebooks.return_value = [
-        MagicMock(id="nb-001", title="AI Research", source_count=3, url="", ownership="owned", is_shared=False, is_owned=True, created_at=None, modified_at=None),
-        MagicMock(id="nb-002", title="Dev Tools", source_count=2, url="", ownership="owned", is_shared=False, is_owned=True, created_at=None, modified_at=None),
+        MagicMock(
+            id="nb-001",
+            title="AI Research",
+            source_count=3,
+            url="",
+            ownership="owned",
+            is_shared=False,
+            is_owned=True,
+            created_at=None,
+            modified_at=None,
+        ),
+        MagicMock(
+            id="nb-002",
+            title="Dev Tools",
+            source_count=2,
+            url="",
+            ownership="owned",
+            is_shared=False,
+            is_owned=True,
+            created_at=None,
+            modified_at=None,
+        ),
     ]
     client.query.return_value = {"answer": "OK", "conversation_id": None, "sources_used": []}
     return client
@@ -43,6 +63,7 @@ class TestBatchQuery:
 
     def test_partial_failure(self, mock_client):
         call_count = [0]
+
         def side_effect(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] == 1:

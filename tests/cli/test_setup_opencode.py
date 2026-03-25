@@ -5,19 +5,18 @@ config schema (uses "mcp" key instead of "mcpServers", command as array).
 """
 
 import json
-import pytest
 from pathlib import Path
 from unittest.mock import patch
 
 from notebooklm_tools.cli.commands.setup import (
-    _opencode_config_path,
-    _setup_opencode,
-    _is_already_configured,
-    _detect_tool,
-    _remove_single,
     CLIENT_REGISTRY,
     MCP_SERVER_CMD,
     OPENCODE_MCP_TIMEOUT_MS,
+    _detect_tool,
+    _is_already_configured,
+    _opencode_config_path,
+    _remove_single,
+    _setup_opencode,
 )
 
 
@@ -129,9 +128,7 @@ class TestIsAlreadyConfigured:
 
     def test_detects_notebooklm_key(self, tmp_path):
         config_path = tmp_path / "opencode.json"
-        config_path.write_text(json.dumps({
-            "mcp": {"notebooklm": {"type": "local"}}
-        }))
+        config_path.write_text(json.dumps({"mcp": {"notebooklm": {"type": "local"}}}))
         with patch(
             "notebooklm_tools.cli.commands.setup._opencode_config_path",
             return_value=config_path,
@@ -140,9 +137,7 @@ class TestIsAlreadyConfigured:
 
     def test_detects_notebooklm_mcp_key(self, tmp_path):
         config_path = tmp_path / "opencode.json"
-        config_path.write_text(json.dumps({
-            "mcp": {"notebooklm-mcp": {"type": "local"}}
-        }))
+        config_path.write_text(json.dumps({"mcp": {"notebooklm-mcp": {"type": "local"}}}))
         with patch(
             "notebooklm_tools.cli.commands.setup._opencode_config_path",
             return_value=config_path,

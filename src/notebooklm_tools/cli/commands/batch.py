@@ -1,6 +1,5 @@
 """Batch CLI commands — perform operations across multiple notebooks."""
 
-
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -17,7 +16,9 @@ app = typer.Typer(
 
 def _print_batch_result(result: dict) -> None:
     """Print a formatted batch result table."""
-    table = Table(title=f"{result['operation']} ({result['succeeded']}/{result['total']} succeeded)")
+    table = Table(
+        title=f"{result['operation']} ({result['succeeded']}/{result['total']} succeeded)"
+    )
     table.add_column("Notebook", style="cyan")
     table.add_column("Status")
     table.add_column("Details", style="dim")
@@ -38,12 +39,14 @@ def _print_batch_result(result: dict) -> None:
 @app.command("query")
 def batch_query(
     query: str = typer.Argument(..., help="Question to ask across notebooks"),
-    notebooks: str | None = typer.Option(None, "--notebooks", "-n", help="Comma-separated notebook names"),
+    notebooks: str | None = typer.Option(
+        None, "--notebooks", "-n", help="Comma-separated notebook names"
+    ),
     tags: str | None = typer.Option(None, "--tags", "-t", help="Comma-separated tags"),
     all_notebooks: bool = typer.Option(False, "--all", "-a", help="Query ALL notebooks"),
 ) -> None:
     """Query multiple notebooks with the same question."""
-    from notebooklm_tools.cli.utils import get_client, handle_error
+    from notebooklm_tools.cli.utils import get_client
     from notebooklm_tools.services import batch as batch_service
 
     try:
@@ -56,18 +59,20 @@ def batch_query(
         _print_batch_result(result)
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("add-source")
 def batch_add_source(
     url: str = typer.Argument(..., help="URL to add as source"),
-    notebooks: str | None = typer.Option(None, "--notebooks", "-n", help="Comma-separated notebook names"),
+    notebooks: str | None = typer.Option(
+        None, "--notebooks", "-n", help="Comma-separated notebook names"
+    ),
     tags: str | None = typer.Option(None, "--tags", "-t", help="Comma-separated tags"),
     all_notebooks: bool = typer.Option(False, "--all", "-a", help="Add to ALL notebooks"),
 ) -> None:
     """Add the same source URL to multiple notebooks."""
-    from notebooklm_tools.cli.utils import get_client, handle_error
+    from notebooklm_tools.cli.utils import get_client
     from notebooklm_tools.services import batch as batch_service
 
     try:
@@ -80,7 +85,7 @@ def batch_add_source(
         _print_batch_result(result)
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("create")
@@ -88,7 +93,7 @@ def batch_create(
     titles: str = typer.Argument(..., help="Comma-separated notebook titles"),
 ) -> None:
     """Create multiple notebooks at once."""
-    from notebooklm_tools.cli.utils import get_client, handle_error
+    from notebooklm_tools.cli.utils import get_client
     from notebooklm_tools.services import batch as batch_service
 
     try:
@@ -100,17 +105,19 @@ def batch_create(
         _print_batch_result(result)
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("delete")
 def batch_delete(
-    notebooks: str | None = typer.Option(None, "--notebooks", "-n", help="Comma-separated notebook names"),
+    notebooks: str | None = typer.Option(
+        None, "--notebooks", "-n", help="Comma-separated notebook names"
+    ),
     tags: str | None = typer.Option(None, "--tags", "-t", help="Comma-separated tags"),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Confirm deletion"),
 ) -> None:
     """Delete multiple notebooks. IRREVERSIBLE."""
-    from notebooklm_tools.cli.utils import get_client, handle_error
+    from notebooklm_tools.cli.utils import get_client
     from notebooklm_tools.services import batch as batch_service
 
     if not confirm:
@@ -127,18 +134,22 @@ def batch_delete(
         _print_batch_result(result)
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("studio")
 def batch_studio(
-    artifact_type: str = typer.Argument("audio", help="Type: audio, video, report, flashcards, etc."),
-    notebooks: str | None = typer.Option(None, "--notebooks", "-n", help="Comma-separated notebook names"),
+    artifact_type: str = typer.Argument(
+        "audio", help="Type: audio, video, report, flashcards, etc."
+    ),
+    notebooks: str | None = typer.Option(
+        None, "--notebooks", "-n", help="Comma-separated notebook names"
+    ),
     tags: str | None = typer.Option(None, "--tags", "-t", help="Comma-separated tags"),
     all_notebooks: bool = typer.Option(False, "--all", "-a", help="Generate for ALL notebooks"),
 ) -> None:
     """Generate studio artifacts across multiple notebooks."""
-    from notebooklm_tools.cli.utils import get_client, handle_error
+    from notebooklm_tools.cli.utils import get_client
     from notebooklm_tools.services import batch as batch_service
 
     try:
@@ -147,8 +158,10 @@ def batch_studio(
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
 
         with console.status(f"[dim]Generating {artifact_type} artifacts...[/dim]"):
-            result = batch_service.batch_studio(client, artifact_type, names, tag_list, all_notebooks)
+            result = batch_service.batch_studio(
+                client, artifact_type, names, tag_list, all_notebooks
+            )
         _print_batch_result(result)
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e

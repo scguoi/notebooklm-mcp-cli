@@ -1,7 +1,6 @@
 """Alias management for NotebookLM CLI."""
 
 import json
-from pathlib import Path
 from typing import Any
 
 from notebooklm_tools.utils.config import get_config_dir
@@ -9,14 +8,14 @@ from notebooklm_tools.utils.config import get_config_dir
 
 class AliasEntry:
     """Represents an alias with its value and type."""
-    
+
     def __init__(self, value: str, alias_type: str = "unknown") -> None:
         self.value = value
         self.type = alias_type
-    
+
     def to_dict(self) -> dict[str, str]:
         return {"value": self.value, "type": self.type}
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any] | str) -> "AliasEntry":
         """Create from dict or legacy string format."""
@@ -39,15 +38,14 @@ class AliasManager:
         """Load aliases from disk."""
         if not self.aliases_file.exists():
             return
-        
+
         try:
             content = self.aliases_file.read_text()
             if content:
                 raw_data = json.loads(content)
                 # Convert to AliasEntry objects (handles legacy format)
                 self._aliases = {
-                    name: AliasEntry.from_dict(data) 
-                    for name, data in raw_data.items()
+                    name: AliasEntry.from_dict(data) for name, data in raw_data.items()
                 }
         except Exception:
             # On error, start with empty map
@@ -68,7 +66,7 @@ class AliasManager:
         """Get an alias value."""
         entry = self._aliases.get(name)
         return entry.value if entry else None
-    
+
     def get_entry(self, name: str) -> AliasEntry | None:
         """Get the full alias entry including type."""
         return self._aliases.get(name)
@@ -110,12 +108,12 @@ def get_alias_manager() -> AliasManager:
 def detect_id_type(value: str, profile: str | None = None) -> str:
     """
     Detect the type of an ID by trying API calls.
-    
+
     Returns: "notebook", "source", or "unknown"
     """
     from notebooklm_tools.cli.utils import get_client
     from notebooklm_tools.core.exceptions import NLMError
-    
+
     try:
         with get_client(profile) as client:
             # Try as notebook ID first (most common)
@@ -125,7 +123,7 @@ def detect_id_type(value: str, profile: str | None = None) -> str:
                     return "notebook"
             except NLMError:
                 pass
-            
+
             # Try as source ID
             try:
                 # Sources need a notebook context, but we can try to get source content
@@ -134,8 +132,8 @@ def detect_id_type(value: str, profile: str | None = None) -> str:
                     return "source"
             except NLMError:
                 pass
-            
+
     except NLMError:
         pass
-    
+
     return "unknown"

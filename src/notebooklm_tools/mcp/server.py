@@ -53,36 +53,37 @@ mcp_logger = logging.getLogger("notebooklm_tools.mcp")
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> JSONResponse:
     """Health check endpoint for load balancers and monitoring."""
-    return JSONResponse({
-        "status": "healthy",
-        "service": "notebooklm-mcp",
-        "version": __version__,
-    })
+    return JSONResponse(
+        {
+            "status": "healthy",
+            "service": "notebooklm-mcp",
+            "version": __version__,
+        }
+    )
 
 
 def _register_tools():
     """Import and register all tools from the modular tools package."""
-    from .tools._utils import register_all_tools
-    
     # Import all tool modules to populate the registry
     from .tools import (  # noqa: F401
-        downloads,
         auth,
-        notebooks,
-        sources,
-        sharing,
-        research,
-        studio,
-        chat,
-        exports,
-        notes,
         batch,
+        chat,
         cross_notebook,
+        downloads,
+        exports,
+        notebooks,
+        notes,
         pipeline,
+        research,
+        sharing,
         smart_select,
+        sources,
+        studio,
         studio_advanced,
     )
-    
+    from .tools._utils import register_all_tools
+
     # Register collected tools with mcp
     register_all_tools(mcp)
 
@@ -93,7 +94,7 @@ _register_tools()
 
 def main():
     """Run the MCP server.
-    
+
     Supports multiple transports:
     - stdio (default): For desktop apps like Claude Desktop
     - http: Streamable HTTP for network access
@@ -118,66 +119,69 @@ Examples:
   notebooklm-mcp --transport http             # HTTP on localhost:8000
   notebooklm-mcp --transport http --port 3000 # HTTP on custom port
   notebooklm-mcp --debug                      # Enable debug logging
-        """
+        """,
     )
-    
+
     parser.add_argument(
-        "--transport", "-t",
+        "--transport",
+        "-t",
         choices=["stdio", "http", "sse"],
         default=os.environ.get("NOTEBOOKLM_MCP_TRANSPORT", "stdio"),
-        help="Transport protocol (default: stdio)"
+        help="Transport protocol (default: stdio)",
     )
     parser.add_argument(
-        "--host", "-H",
+        "--host",
+        "-H",
         default=os.environ.get("NOTEBOOKLM_MCP_HOST", "127.0.0.1"),
-        help="Host to bind for HTTP/SSE (default: 127.0.0.1)"
+        help="Host to bind for HTTP/SSE (default: 127.0.0.1)",
     )
     parser.add_argument(
-        "--port", "-p",
+        "--port",
+        "-p",
         type=int,
         default=int(os.environ.get("NOTEBOOKLM_MCP_PORT", "8000")),
-        help="Port for HTTP/SSE transport (default: 8000)"
+        help="Port for HTTP/SSE transport (default: 8000)",
     )
     parser.add_argument(
         "--path",
         default=os.environ.get("NOTEBOOKLM_MCP_PATH", "/mcp"),
-        help="MCP endpoint path for HTTP (default: /mcp)"
+        help="MCP endpoint path for HTTP (default: /mcp)",
     )
     parser.add_argument(
         "--stateless",
         action="store_true",
         default=os.environ.get("NOTEBOOKLM_MCP_STATELESS", "").lower() == "true",
-        help="Enable stateless mode for horizontal scaling"
+        help="Enable stateless mode for horizontal scaling",
     )
     parser.add_argument(
         "--debug",
         action="store_true",
         default=os.environ.get("NOTEBOOKLM_MCP_DEBUG", "").lower() == "true",
-        help="Enable debug logging"
+        help="Enable debug logging",
     )
     parser.add_argument(
         "--query-timeout",
         type=float,
         default=float(os.environ.get("NOTEBOOKLM_QUERY_TIMEOUT", "120.0")),
-        help="Query timeout in seconds (default: 120.0)"
+        help="Query timeout in seconds (default: 120.0)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Configure debug logging
     if args.debug:
         logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         mcp_logger.setLevel(logging.DEBUG)
         # Also enable core client logging
         logging.getLogger("notebooklm_tools.core").setLevel(logging.DEBUG)
-    
+
     # Set query timeout
     from .tools._utils import set_query_timeout
+
     set_query_timeout(args.query_timeout)
-    
+
     # Run server with appropriate transport
     # show_banner=False prevents Rich box-drawing output that can corrupt
     # the JSON-RPC protocol on Windows (especially with non-English locales)

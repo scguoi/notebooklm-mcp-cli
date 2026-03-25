@@ -2,14 +2,14 @@
 
 import json
 import sys
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from rich.console import Console
 from rich.table import Table
 
 
-class OutputFormat(str, Enum):
+class OutputFormat(StrEnum):
     """Output format options."""
 
     TABLE = "table"
@@ -30,13 +30,13 @@ def detect_output_format(
 ) -> OutputFormat:
     """
     Detect the appropriate output format based on flags and TTY.
-    
+
     Args:
         json_flag: User explicitly requested JSON output.
         quiet_flag: User requested quiet/compact output.
         title_flag: User requested title output (for notebooks).
         url_flag: User requested URL output (for sources).
-    
+
     Returns:
         The output format to use.
     """
@@ -44,11 +44,11 @@ def detect_output_format(
         return OutputFormat.JSON
     if quiet_flag or title_flag or url_flag:
         return OutputFormat.COMPACT
-    
+
     # Auto-detect based on TTY
     if not sys.stdout.isatty():
         return OutputFormat.JSON
-    
+
     return OutputFormat.TABLE
 
 
@@ -121,15 +121,15 @@ class TableFormatter(Formatter):
         table.add_column("Title", overflow="ellipsis", max_width=50)
         table.add_column("Src", justify="right", width=4)
         table.add_column("Updated", no_wrap=True, width=10)
-        
+
         if full:
             table.add_column("Created", no_wrap=True, width=10)
 
         for nb in notebooks:
             # Handle both source_count and sources_count for compatibility
-            src_count = getattr(nb, 'source_count', None) or getattr(nb, 'sources_count', 0)
+            src_count = getattr(nb, "source_count", None) or getattr(nb, "sources_count", 0)
             # Handle both modified_at and updated_at - format as short date
-            updated = getattr(nb, 'modified_at', None) or getattr(nb, 'updated_at', None)
+            updated = getattr(nb, "modified_at", None) or getattr(nb, "updated_at", None)
             if updated:
                 if isinstance(updated, str):
                     updated_str = updated[:10]  # Just the date part
@@ -137,7 +137,7 @@ class TableFormatter(Formatter):
                     updated_str = updated.strftime("%Y-%m-%d")
             else:
                 updated_str = "-"
-            
+
             row = [
                 str(nb.id),  # Full ID for copy/paste
                 nb.title,
@@ -145,9 +145,11 @@ class TableFormatter(Formatter):
                 updated_str,
             ]
             if full:
-                created = getattr(nb, 'created_at', None)
+                created = getattr(nb, "created_at", None)
                 if created:
-                    created_str = created[:10] if isinstance(created, str) else created.strftime("%Y-%m-%d")
+                    created_str = (
+                        created[:10] if isinstance(created, str) else created.strftime("%Y-%m-%d")
+                    )
                 else:
                     created_str = "-"
                 row.append(created_str)
@@ -169,7 +171,7 @@ class TableFormatter(Formatter):
         table.add_column("ID", style="cyan", min_width=36, no_wrap=True)
         table.add_column("Title", max_width=30, overflow="ellipsis")
         table.add_column("Type")
-        
+
         if full:
             table.add_column("URL", overflow="fold", max_width=80)
             table.add_column("Stale", justify="center")
@@ -177,25 +179,25 @@ class TableFormatter(Formatter):
         for src in sources:
             # Handle both dict and object
             if isinstance(src, dict):
-                src_id = src.get('id', '')
-                src_title = src.get('title', 'Untitled')
-                src_type = src.get('source_type_name') or src.get('type', 'unknown')
-                src_url = src.get('url', '')
-                is_stale = src.get('is_stale', False)
+                src_id = src.get("id", "")
+                src_title = src.get("title", "Untitled")
+                src_type = src.get("source_type_name") or src.get("type", "unknown")
+                src_url = src.get("url", "")
+                is_stale = src.get("is_stale", False)
             else:
                 src_id = str(src.id)
                 src_title = src.title
                 src_type = src.type
-                src_url = getattr(src, 'url', '') or ''
-                is_stale = getattr(src, 'is_stale', False)
-            
+                src_url = getattr(src, "url", "") or ""
+                is_stale = getattr(src, "is_stale", False)
+
             row = [
                 src_id,
                 src_title,
                 src_type,
             ]
             if full:
-                row.extend([src_url or '-', '⚠️' if is_stale else ''])
+                row.extend([src_url or "-", "⚠️" if is_stale else ""])
             table.add_row(*row)
 
         self.console.print(table)
@@ -214,47 +216,47 @@ class TableFormatter(Formatter):
         table.add_column("Title", max_width=40)
         table.add_column("Type")
         table.add_column("Status")
-        
+
         if full:
             table.add_column("URL")
 
         for art in artifacts:
             # Handle both dict and object
             if isinstance(art, dict):
-                art_id = art.get('artifact_id', art.get('id', ''))
-                art_type = art.get('type', 'unknown')
-                art_status = art.get('status', 'unknown')
-                art_title = art.get('title', '')
-                art_url = art.get('url', '')
+                art_id = art.get("artifact_id", art.get("id", ""))
+                art_type = art.get("type", "unknown")
+                art_status = art.get("status", "unknown")
+                art_title = art.get("title", "")
+                art_url = art.get("url", "")
             else:
                 art_id = str(art.id)
                 art_type = art.type
                 art_status = art.status
-                art_title = getattr(art, 'title', '')
-                art_url = getattr(art, 'url', '')
-            
+                art_title = getattr(art, "title", "")
+                art_url = getattr(art, "url", "")
+
             # Status with color and Unicode symbol for quick scanning
             status_config = {
-                'completed': ('green', '✓'),
-                'pending': ('yellow', '●'),
-                'in_progress': ('yellow', '●'),
-                'failed': ('red', '✗'),
+                "completed": ("green", "✓"),
+                "pending": ("yellow", "●"),
+                "in_progress": ("yellow", "●"),
+                "failed": ("red", "✗"),
             }
-            
+
             if art_status in status_config:
                 style, symbol = status_config[art_status]
-                status_display = f'[{style}]{symbol} {art_status}[/{style}]'
+                status_display = f"[{style}]{symbol} {art_status}[/{style}]"
             else:
                 status_display = art_status
-            
+
             row = [
                 art_id,
-                art_title or '-',
+                art_title or "-",
                 art_type,
                 status_display,
             ]
             if full:
-                row.append(art_url or '-')
+                row.append(art_url or "-")
             table.add_row(*row)
 
         self.console.print(table)
@@ -262,21 +264,23 @@ class TableFormatter(Formatter):
     def format_item(self, item: Any, title: str = "") -> None:
         if title:
             self.console.print(f"[bold]{title}[/bold]")
-        
+
         if hasattr(item, "model_dump"):
             data = item.model_dump(exclude_none=True)
         elif hasattr(item, "__dict__"):
             data = {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
         else:
             data = {"value": item}
-        
+
         for key, value in data.items():
             # Special handling for sources list
             if key == "sources" and isinstance(value, list):
                 self.console.print(f"  [cyan]{key}:[/cyan]")
                 for src in value:
                     if isinstance(src, dict):
-                        self.console.print(f"    • {src.get('title', 'Untitled')} [dim]({src.get('id', '')})[/dim]")
+                        self.console.print(
+                            f"    • {src.get('title', 'Untitled')} [dim]({src.get('id', '')})[/dim]"
+                        )
                     else:
                         self.console.print(f"    • {src}")
             else:
@@ -294,12 +298,12 @@ class JsonFormatter(Formatter):
     ) -> None:
         data = []
         for nb in notebooks:
-            src_count = getattr(nb, 'source_count', None) or getattr(nb, 'sources_count', 0)
+            src_count = getattr(nb, "source_count", None) or getattr(nb, "sources_count", 0)
             item = {"id": nb.id, "title": nb.title, "source_count": src_count}
-            updated = getattr(nb, 'modified_at', None) or getattr(nb, 'updated_at', None)
+            updated = getattr(nb, "modified_at", None) or getattr(nb, "updated_at", None)
             if updated:
                 item["updated_at"] = updated if isinstance(updated, str) else updated.isoformat()
-            created = getattr(nb, 'created_at', None)
+            created = getattr(nb, "created_at", None)
             if full and created:
                 item["created_at"] = created if isinstance(created, str) else created.isoformat()
             data.append(item)
@@ -315,22 +319,22 @@ class JsonFormatter(Formatter):
         for src in sources:
             if isinstance(src, dict):
                 item = {
-                    'id': src.get('id', ''),
-                    'title': src.get('title', ''),
-                    'type': src.get('source_type_name') or src.get('type', ''),
-                    'url': src.get('url', ''),
+                    "id": src.get("id", ""),
+                    "title": src.get("title", ""),
+                    "type": src.get("source_type_name") or src.get("type", ""),
+                    "url": src.get("url", ""),
                 }
                 if full:
-                    item['is_stale'] = src.get('is_stale', False)
+                    item["is_stale"] = src.get("is_stale", False)
             else:
                 item = {
-                    'id': src.id,
-                    'title': src.title,
-                    'type': src.type,
-                    'url': getattr(src, 'url', '') or '',
+                    "id": src.id,
+                    "title": src.title,
+                    "type": src.type,
+                    "url": getattr(src, "url", "") or "",
                 }
                 if full:
-                    item['is_stale'] = getattr(src, 'is_stale', False)
+                    item["is_stale"] = getattr(src, "is_stale", False)
             data.append(item)
         print_json(data)
 
@@ -343,24 +347,26 @@ class JsonFormatter(Formatter):
         for art in artifacts:
             if isinstance(art, dict):
                 item = {
-                    'id': art.get('artifact_id', art.get('id', '')),
-                    'type': art.get('type', ''),
-                    'status': art.get('status', ''),
-                    'custom_instructions': art.get('custom_instructions', None),  # Always include
+                    "id": art.get("artifact_id", art.get("id", "")),
+                    "type": art.get("type", ""),
+                    "status": art.get("status", ""),
+                    "custom_instructions": art.get("custom_instructions", None),  # Always include
                 }
                 if full:
-                    item['title'] = art.get('title', '')
-                    item['url'] = art.get('url', '')
+                    item["title"] = art.get("title", "")
+                    item["url"] = art.get("url", "")
             else:
                 item = {
-                    'id': art.id,
-                    'type': art.type,
-                    'status': art.status,
-                    'custom_instructions': getattr(art, 'custom_instructions', None),  # Always include
+                    "id": art.id,
+                    "type": art.type,
+                    "status": art.status,
+                    "custom_instructions": getattr(
+                        art, "custom_instructions", None
+                    ),  # Always include
                 }
                 if full:
-                    item['title'] = getattr(art, 'title', '')
-                    item['url'] = getattr(art, 'url', '')
+                    item["title"] = getattr(art, "title", "")
+                    item["url"] = getattr(art, "url", "")
             data.append(item)
         print_json(data)
 
@@ -397,12 +403,12 @@ class CompactFormatter(Formatter):
     ) -> None:
         for src in sources:
             if isinstance(src, dict):
-                src_id = src.get('id', '')
-                src_url = src.get('url', '')
+                src_id = src.get("id", "")
+                src_url = src.get("url", "")
             else:
                 src_id = str(src.id)
-                src_url = getattr(src, 'url', '') or ''
-            
+                src_url = getattr(src, "url", "") or ""
+
             if url_only:
                 if src_url:
                     print(f"{src_id}: {src_url}")
@@ -416,7 +422,7 @@ class CompactFormatter(Formatter):
     ) -> None:
         for art in artifacts:
             if isinstance(art, dict):
-                print(art.get('artifact_id', art.get('id', '')))
+                print(art.get("artifact_id", art.get("id", "")))
             else:
                 print(art.id)
 

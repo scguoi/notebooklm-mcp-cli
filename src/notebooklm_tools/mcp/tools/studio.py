@@ -2,9 +2,10 @@
 
 from typing import Any
 
-from ._utils import get_client, logged_tool
-from ...services import studio as studio_service, ServiceError, ValidationError
+from ...services import ServiceError, ValidationError
+from ...services import studio as studio_service
 from ...utils.config import get_default_language
+from ._utils import get_client, logged_tool
 
 
 @logged_tool()
@@ -96,9 +97,18 @@ def studio_create(
         if artifact_type == "audio":
             settings.update({"format": audio_format, "length": audio_length, "language": language})
         elif artifact_type == "video":
-            settings.update({"format": video_format, "visual_style": visual_style, "language": language})
+            settings.update(
+                {"format": video_format, "visual_style": visual_style, "language": language}
+            )
         elif artifact_type == "infographic":
-            settings.update({"orientation": orientation, "detail_level": detail_level, "infographic_style": infographic_style, "language": language})
+            settings.update(
+                {
+                    "orientation": orientation,
+                    "detail_level": detail_level,
+                    "infographic_style": infographic_style,
+                    "language": language,
+                }
+            )
         elif artifact_type == "slide_deck":
             settings.update({"format": slide_format, "length": slide_length, "language": language})
         elif artifact_type == "report":
@@ -124,17 +134,27 @@ def studio_create(
     try:
         client = get_client()
         result = studio_service.create_artifact(
-            client, notebook_id, artifact_type,
+            client,
+            notebook_id,
+            artifact_type,
             source_ids=source_ids,
-            audio_format=audio_format, audio_length=audio_length,
-            video_format=video_format, visual_style=visual_style,
-            orientation=orientation, detail_level=detail_level,
+            audio_format=audio_format,
+            audio_length=audio_length,
+            video_format=video_format,
+            visual_style=visual_style,
+            orientation=orientation,
+            detail_level=detail_level,
             infographic_style=infographic_style,
-            slide_format=slide_format, slide_length=slide_length,
-            report_format=report_format, custom_prompt=custom_prompt,
-            question_count=question_count, difficulty=difficulty,
-            language=language, focus_prompt=focus_prompt,
-            title=title, description=description,
+            slide_format=slide_format,
+            slide_length=slide_length,
+            report_format=report_format,
+            custom_prompt=custom_prompt,
+            question_count=question_count,
+            difficulty=difficulty,
+            language=language,
+            focus_prompt=focus_prompt,
+            title=title,
+            description=description,
         )
         return {
             "status": "success",
@@ -142,7 +162,10 @@ def studio_create(
             **result,
         }
     except (ValidationError, ServiceError) as e:
-        return {"status": "error", "error": e.user_message if isinstance(e, ServiceError) else str(e)}
+        return {
+            "status": "error",
+            "error": e.user_message if isinstance(e, ServiceError) else str(e),
+        }
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -181,6 +204,7 @@ def studio_status(
     try:
         if action == "list_types":
             from .studio_advanced import _get_studio_types
+
             return _get_studio_types()
 
         client = get_client()
@@ -207,7 +231,10 @@ def studio_status(
             "notebook_url": f"https://notebooklm.google.com/notebook/{notebook_id}",
         }
     except (ValidationError, ServiceError) as e:
-        return {"status": "error", "error": e.user_message if isinstance(e, ServiceError) else str(e)}
+        return {
+            "status": "error",
+            "error": e.user_message if isinstance(e, ServiceError) else str(e),
+        }
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -292,7 +319,9 @@ def studio_revise(
                 "slides_to_revise": [
                     f"Slide {s.get('slide', '?')}: {s.get('instruction', '')}"
                     for s in slide_instructions
-                ] if slide_instructions else [],
+                ]
+                if slide_instructions
+                else [],
             },
             "note": "This creates a NEW slide deck with revisions applied. The original is not modified. Set confirm=True after user approves.",
         }
@@ -300,7 +329,9 @@ def studio_revise(
     try:
         client = get_client()
         result = studio_service.revise_artifact(
-            client, artifact_id, slide_instructions,
+            client,
+            artifact_id,
+            slide_instructions,
         )
         return {
             "status": "success",
@@ -308,6 +339,9 @@ def studio_revise(
             **result,
         }
     except (ValidationError, ServiceError) as e:
-        return {"status": "error", "error": e.user_message if isinstance(e, ServiceError) else str(e)}
+        return {
+            "status": "error",
+            "error": e.user_message if isinstance(e, ServiceError) else str(e),
+        }
     except Exception as e:
         return {"status": "error", "error": str(e)}

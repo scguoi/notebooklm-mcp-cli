@@ -1,18 +1,19 @@
 """Tests for services.downloads module."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 
 from notebooklm_tools.services.downloads import (
-    validate_artifact_type,
-    validate_output_format,
-    get_default_extension,
-    download_sync,
-    download_async,
     VALID_ARTIFACT_TYPES,
     VALID_OUTPUT_FORMATS,
+    download_async,
+    download_sync,
+    get_default_extension,
+    validate_artifact_type,
+    validate_output_format,
 )
-from notebooklm_tools.services.errors import ValidationError, ServiceError
+from notebooklm_tools.services.errors import ServiceError, ValidationError
 
 
 @pytest.fixture
@@ -140,7 +141,10 @@ class TestDownloadAsync:
     @pytest.mark.asyncio
     async def test_download_quiz_json(self, mock_client):
         result = await download_async(
-            mock_client, "nb-1", "quiz", "/tmp/q.json",
+            mock_client,
+            "nb-1",
+            "quiz",
+            "/tmp/q.json",
             output_format="json",
         )
         assert result["path"] == "/tmp/quiz.json"
@@ -148,7 +152,10 @@ class TestDownloadAsync:
     @pytest.mark.asyncio
     async def test_download_flashcards_html(self, mock_client):
         result = await download_async(
-            mock_client, "nb-1", "flashcards", "/tmp/f.html",
+            mock_client,
+            "nb-1",
+            "flashcards",
+            "/tmp/f.html",
             output_format="html",
         )
         assert result["path"] == "/tmp/flashcards.json"
@@ -162,7 +169,10 @@ class TestDownloadAsync:
     async def test_invalid_format_for_quiz_raises_validation_error(self, mock_client):
         with pytest.raises(ValidationError, match="Invalid output format"):
             await download_async(
-                mock_client, "nb-1", "quiz", "/tmp/out",
+                mock_client,
+                "nb-1",
+                "quiz",
+                "/tmp/out",
                 output_format="pdf",
             )
 
@@ -182,12 +192,17 @@ class TestDownloadAsync:
     async def test_progress_callback_passed_through(self, mock_client):
         cb = MagicMock()
         await download_async(
-            mock_client, "nb-1", "audio", "/tmp/a.m4a",
+            mock_client,
+            "nb-1",
+            "audio",
+            "/tmp/a.m4a",
             progress_callback=cb,
         )
         # Verify the callback was passed to the client method
         mock_client.download_audio.assert_called_once_with(
-            "nb-1", "/tmp/a.m4a", None,
+            "nb-1",
+            "/tmp/a.m4a",
+            None,
             progress_callback=cb,
         )
 
@@ -214,4 +229,3 @@ class TestDownloadAsync:
         assert result["artifact_type"] == "data_table"
         assert result["path"] == "/tmp/table.csv"
         mock_client.download_data_table.assert_called_once_with("nb-1", "/tmp/dt.csv", None)
-

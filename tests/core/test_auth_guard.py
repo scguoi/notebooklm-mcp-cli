@@ -30,11 +30,12 @@ def test_account_mismatch_error_has_hint():
     assert "--force" in err.hint
 
 
-import json
-import pytest
-from pathlib import Path
-from notebooklm_tools.core.auth import AuthManager
-from notebooklm_tools.core.exceptions import AccountMismatchError
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import pytest  # noqa: E402
+
+from notebooklm_tools.core.auth import AuthManager  # noqa: E402
 
 
 class TestSaveProfileMismatchGuard:
@@ -47,12 +48,16 @@ class TestSaveProfileMismatchGuard:
 
         cookies = [{"name": "SID", "value": "old-sid"}]
         (profiles_dir / "cookies.json").write_text(json.dumps(cookies))
-        (profiles_dir / "metadata.json").write_text(json.dumps({
-            "csrf_token": "old-token",
-            "session_id": "old-session",
-            "email": email,
-            "last_validated": "2026-01-01T00:00:00",
-        }))
+        (profiles_dir / "metadata.json").write_text(
+            json.dumps(
+                {
+                    "csrf_token": "old-token",
+                    "session_id": "old-session",
+                    "email": email,
+                    "last_validated": "2026-01-01T00:00:00",
+                }
+            )
+        )
 
         manager = AuthManager("test-profile")
         # Patch profile_dir to use tmp_path
@@ -212,8 +217,9 @@ class TestBuildLabelExtraction:
 
     def test_profile_build_label_defaults_none_for_old_profiles(self, tmp_path, monkeypatch):
         """Old profiles without build_label in metadata load with None."""
-        from notebooklm_tools.core.auth import AuthManager
         import json
+
+        from notebooklm_tools.core.auth import AuthManager
 
         monkeypatch.setattr(
             "notebooklm_tools.utils.config.get_profile_dir",
@@ -224,11 +230,15 @@ class TestBuildLabelExtraction:
         profile_dir = tmp_path / "old-profile"
         profile_dir.mkdir(parents=True)
         (profile_dir / "cookies.json").write_text(json.dumps({"SID": "abc"}))
-        (profile_dir / "metadata.json").write_text(json.dumps({
-            "csrf_token": "csrf",
-            "session_id": "sid",
-            "email": "test@gmail.com",
-        }))
+        (profile_dir / "metadata.json").write_text(
+            json.dumps(
+                {
+                    "csrf_token": "csrf",
+                    "session_id": "sid",
+                    "email": "test@gmail.com",
+                }
+            )
+        )
 
         manager = AuthManager("old-profile")
         loaded = manager.load_profile()

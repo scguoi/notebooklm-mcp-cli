@@ -6,8 +6,9 @@ Used by _call_rpc() and file upload methods.
 
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any
 
 import httpx
 
@@ -46,6 +47,7 @@ def retry_on_server_error(
     Returns:
         Decorated function with retry logic.
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -57,7 +59,7 @@ def retry_on_server_error(
                     if not is_retryable_error(e) or attempt == max_retries:
                         raise
                     last_exception = e
-                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    delay = min(base_delay * (2**attempt), max_delay)
                     status = e.response.status_code
                     logger.warning(
                         f"Server error {status} on attempt {attempt + 1}/{max_retries + 1}, "
@@ -68,7 +70,9 @@ def retry_on_server_error(
             # and any non-retryable error is re-raised immediately above
             assert last_exception is not None
             raise last_exception
+
         return wrapper
+
     return decorator
 
 
@@ -107,7 +111,7 @@ def execute_with_retry(
             if not is_retryable_error(e) or attempt == max_retries:
                 raise
             last_exception = e
-            delay = min(base_delay * (2 ** attempt), max_delay)
+            delay = min(base_delay * (2**attempt), max_delay)
             status = e.response.status_code
             logger.warning(
                 f"Server error {status} on attempt {attempt + 1}/{max_retries + 1}, "

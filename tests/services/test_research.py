@@ -1,15 +1,16 @@
 """Tests for services.research module."""
 
-import pytest
 from unittest.mock import MagicMock
 
-from notebooklm_tools.services.research import (
-    start_research,
-    poll_research,
-    import_research,
-)
-from notebooklm_tools.services.errors import ValidationError, ServiceError
+import pytest
+
 from notebooklm_tools.core.errors import RPCError
+from notebooklm_tools.services.errors import ServiceError, ValidationError
+from notebooklm_tools.services.research import (
+    import_research,
+    poll_research,
+    start_research,
+)
 
 
 @pytest.fixture
@@ -177,7 +178,9 @@ class TestImportResearch:
             "sources": [{"title": "A"}, {"title": "B"}, {"title": "C"}],
         }
         mock_client.import_research_sources.return_value = [
-            {"title": "A"}, {"title": "B"}, {"title": "C"},
+            {"title": "A"},
+            {"title": "B"},
+            {"title": "C"},
         ]
 
         result = import_research(mock_client, "nb-1", "task-1")
@@ -191,7 +194,7 @@ class TestImportResearch:
         }
         mock_client.import_research_sources.return_value = [{"title": "B"}]
 
-        result = import_research(mock_client, "nb-1", "task-1", source_indices=[1])
+        import_research(mock_client, "nb-1", "task-1", source_indices=[1])
 
         # Verify the correct source was passed
         call_args = mock_client.import_research_sources.call_args

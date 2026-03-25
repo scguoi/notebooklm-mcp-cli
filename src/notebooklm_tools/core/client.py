@@ -7,58 +7,23 @@ and adds all domain-specific operations (notebooks, sources, studio, etc.).
 Internal API. See CLAUDE.md for full documentation.
 """
 
-import json
-import logging
-import re
-
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Callable
-
-import httpx
-
 from . import constants
-from .base import BaseClient, DEFAULT_TIMEOUT, SOURCE_ADD_TIMEOUT, logger
 from .conversation import ConversationMixin
 from .download import DownloadMixin
+
+# Import utility functions from utils module
+# Import dataclasses from data_types module (re-exported for backward compatibility)
+# Import exception classes from errors module (re-exported for backward compatibility)
+from .errors import (
+    ClientAuthenticationError,
+)
+from .exports import ExportMixin
 from .notebooks import NotebookMixin
 from .notes import NotesMixin
 from .research import ResearchMixin
 from .sharing import SharingMixin
 from .sources import SourceMixin
 from .studio import StudioMixin
-from .exports import ExportMixin
-
-
-# Import utility functions from utils module
-from .utils import (
-    RPC_NAMES,
-    _format_debug_json,
-    _decode_request_body,
-    _parse_url_params,
-    parse_timestamp,
-    extract_cookies_from_chrome_export,
-)
-
-# Import dataclasses from data_types module (re-exported for backward compatibility)
-from .data_types import (
-    ConversationTurn,
-    Collaborator,
-    ShareStatus,
-    Notebook,
-)
-
-
-# Import exception classes from errors module (re-exported for backward compatibility)
-from .errors import (
-    NotebookLMError,
-    ArtifactError,
-    ArtifactNotReadyError,
-    ArtifactParseError,
-    ArtifactDownloadError,
-    ArtifactNotFoundError,
-    ClientAuthenticationError,
-)
 
 # Backward compatibility alias - code importing AuthenticationError from client.py
 # will get the ClientAuthenticationError from errors.py
@@ -70,7 +35,17 @@ OWNERSHIP_MINE = constants.OWNERSHIP_MINE
 OWNERSHIP_SHARED = constants.OWNERSHIP_SHARED
 
 
-class NotebookLMClient(ExportMixin, DownloadMixin, StudioMixin, ResearchMixin, ConversationMixin, SourceMixin, SharingMixin, NotebookMixin, NotesMixin):
+class NotebookLMClient(
+    ExportMixin,
+    DownloadMixin,
+    StudioMixin,
+    ResearchMixin,
+    ConversationMixin,
+    SourceMixin,
+    SharingMixin,
+    NotebookMixin,
+    NotesMixin,
+):
     """Client for NotebookLM MCP internal API.
 
     This class extends BaseClient with all domain-specific operations:
@@ -84,7 +59,7 @@ class NotebookLMClient(ExportMixin, DownloadMixin, StudioMixin, ResearchMixin, C
 
     All HTTP/RPC infrastructure is provided by the BaseClient base class.
     """
-    
+
     # Note: All RPC IDs, API constants, and infrastructure methods are inherited from BaseClient
 
     # =========================================================================

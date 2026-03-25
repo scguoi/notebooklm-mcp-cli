@@ -5,25 +5,27 @@ import csv
 import html as html_module
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
-from . import constants
 from .base import BaseClient, logger
 from .errors import (
     ArtifactDownloadError,
     ArtifactNotFoundError,
     ArtifactNotReadyError,
     ArtifactParseError,
+)
+from .errors import (
     ClientAuthenticationError as AuthenticationError,
 )
 
 
 class DownloadMixin(BaseClient):
     """Mixin for artifact download operations.
-    
+
     This mixin provides methods for downloading various artifact types:
     - Audio (MP4/MP3)
     - Video (MP4)
@@ -45,7 +47,7 @@ class DownloadMixin(BaseClient):
         url: str,
         output_path: str,
         progress_callback: Callable[[int, int], None] | None = None,
-        chunk_size: int = 65536
+        chunk_size: int = 65536,
     ) -> str:
         """Download content from a URL to a local file with streaming support.
 
@@ -76,9 +78,11 @@ class DownloadMixin(BaseClient):
         temp_file = output_file.with_suffix(output_file.suffix + ".tmp")
 
         # Build headers with auth cookies
-        base_headers = getattr(self, "_PAGE_FETCH_HEADERS", {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-        })
+        base_headers = getattr(
+            self,
+            "_PAGE_FETCH_HEADERS",
+            {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
+        )
         headers = {**base_headers, "Referer": "https://notebooklm.google.com/"}
 
         # Use httpx.Cookies for proper cross-domain redirect handling
@@ -89,59 +93,61 @@ class DownloadMixin(BaseClient):
         timeout = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=30.0)
 
         try:
-            async with httpx.AsyncClient(
-                cookies=cookies,
-                headers=headers,
-                follow_redirects=True,
-                timeout=timeout
-            ) as client:
-                async with client.stream("GET", url) as response:
-                    response.raise_for_status()
+            async with (
+                httpx.AsyncClient(
+                    cookies=cookies, headers=headers, follow_redirects=True, timeout=timeout
+                ) as client,
+                client.stream("GET", url) as response,
+            ):
+                response.raise_for_status()
 
-                    # Get total size if available
-                    content_length = response.headers.get("content-length")
-                    total_bytes = int(content_length) if content_length else 0
+                # Get total size if available
+                content_length = response.headers.get("content-length")
+                total_bytes = int(content_length) if content_length else 0
 
-                    # Check for auth redirect before starting download
-                    content_type = response.headers.get("content-type", "").lower()
-                    if "text/html" in content_type:
-                        # Read first chunk to check for login page
-                        first_chunk = b""
-                        async for chunk in response.aiter_bytes(chunk_size=8192):
-                            first_chunk = chunk
-                            break
+                # Check for auth redirect before starting download
+                content_type = response.headers.get("content-type", "").lower()
+                if "text/html" in content_type:
+                    # Read first chunk to check for login page
+                    first_chunk = b""
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        first_chunk = chunk
+                        break
 
-                        if b"<!doctype html>" in first_chunk.lower() or b"sign in" in first_chunk.lower():
-                            raise AuthenticationError(
-                                "Download failed: Redirected to login page. "
-                                "Run 'nlm login' to refresh credentials."
-                            )
+                    if (
+                        b"<!doctype html>" in first_chunk.lower()
+                        or b"sign in" in first_chunk.lower()
+                    ):
+                        raise AuthenticationError(
+                            "Download failed: Redirected to login page. "
+                            "Run 'nlm login' to refresh credentials."
+                        )
 
-                        # Not an auth error - write first chunk and continue
-                        with open(temp_file, "wb") as f:
-                            f.write(first_chunk)
-                            bytes_downloaded = len(first_chunk)
+                    # Not an auth error - write first chunk and continue
+                    with open(temp_file, "wb") as f:
+                        f.write(first_chunk)
+                        bytes_downloaded = len(first_chunk)
+
+                        if progress_callback:
+                            progress_callback(bytes_downloaded, total_bytes)
+
+                        # Continue streaming rest of file
+                        async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                            f.write(chunk)
+                            bytes_downloaded += len(chunk)
 
                             if progress_callback:
                                 progress_callback(bytes_downloaded, total_bytes)
+                else:
+                    # Binary content - stream directly
+                    bytes_downloaded = 0
+                    with open(temp_file, "wb") as f:
+                        async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                            f.write(chunk)
+                            bytes_downloaded += len(chunk)
 
-                            # Continue streaming rest of file
-                            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                                f.write(chunk)
-                                bytes_downloaded += len(chunk)
-
-                                if progress_callback:
-                                    progress_callback(bytes_downloaded, total_bytes)
-                    else:
-                        # Binary content - stream directly
-                        bytes_downloaded = 0
-                        with open(temp_file, "wb") as f:
-                            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                                f.write(chunk)
-                                bytes_downloaded += len(chunk)
-
-                                if progress_callback:
-                                    progress_callback(bytes_downloaded, total_bytes)
+                            if progress_callback:
+                                progress_callback(bytes_downloaded, total_bytes)
 
             # Move temp file to final location only on success
             temp_file.rename(output_file)
@@ -152,16 +158,14 @@ class DownloadMixin(BaseClient):
             if temp_file.exists():
                 temp_file.unlink()
             raise ArtifactDownloadError(
-                "file",
-                details=f"HTTP error downloading from {url[:50]}...: {e}"
+                "file", details=f"HTTP error downloading from {url[:50]}...: {e}"
             ) from e
         except Exception as e:
             # Clean up temp file on failure
             if temp_file.exists():
                 temp_file.unlink()
             raise ArtifactDownloadError(
-                "file",
-                details=f"Failed to download from {url[:50]}...: {str(e)}"
+                "file", details=f"Failed to download from {url[:50]}...: {str(e)}"
             ) from e
 
     def _list_raw(self, notebook_id: str) -> list[Any]:
@@ -170,17 +174,17 @@ class DownloadMixin(BaseClient):
         params = [[2], notebook_id, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"']
         body = self._build_request_body(self.RPC_POLL_STUDIO, params)
         url = self._build_url(self.RPC_POLL_STUDIO, f"/notebook/{notebook_id}")
-        
+
         client = self._get_client()
         response = client.post(url, content=body)
         response.raise_for_status()
-        
+
         parsed = self._parse_response(response.text)
         result = self._extract_rpc_result(parsed, self.RPC_POLL_STUDIO)
-        
+
         if result and isinstance(result, list) and len(result) > 0:
-             # Response is an array of artifacts, possibly wrapped
-             return result[0] if isinstance(result[0], list) else result
+            # Response is an array of artifacts, possibly wrapped
+            return result[0] if isinstance(result[0], list) else result
         return []
 
     # =========================================================================
@@ -210,7 +214,7 @@ class DownloadMixin(BaseClient):
         # Filter for completed audio (Type 1, Status 3)
         candidates = []
         for a in artifacts:
-            if isinstance(a, list) and len(a) > 4:
+            if isinstance(a, list) and len(a) > 4:  # noqa: SIM102
                 if a[2] == self.STUDIO_TYPE_AUDIO and a[4] == 3:
                     candidates.append(a)
 
@@ -277,7 +281,7 @@ class DownloadMixin(BaseClient):
         # Filter for completed video (Type 3, Status 3)
         candidates = []
         for a in artifacts:
-            if isinstance(a, list) and len(a) > 4:
+            if isinstance(a, list) and len(a) > 4:  # noqa: SIM102
                 if a[2] == self.STUDIO_TYPE_VIDEO and a[4] == 3:
                     candidates.append(a)
 
@@ -301,9 +305,14 @@ class DownloadMixin(BaseClient):
             # First, find the media_list (nested list containing URLs)
             media_list = None
             for item in metadata:
-                if (isinstance(item, list) and len(item) > 0 and
-                    isinstance(item[0], list) and len(item[0]) > 0 and
-                    isinstance(item[0][0], str) and item[0][0].startswith("http")):
+                if (
+                    isinstance(item, list)
+                    and len(item) > 0
+                    and isinstance(item[0], list)
+                    and len(item[0]) > 0
+                    and isinstance(item[0][0], str)
+                    and item[0][0].startswith("http")
+                ):
                     media_list = item
                     break
 
@@ -354,7 +363,7 @@ class DownloadMixin(BaseClient):
         # Filter for completed infographics (Type 7, Status 3)
         candidates = []
         for a in artifacts:
-            if isinstance(a, list) and len(a) > 5:
+            if isinstance(a, list) and len(a) > 5:  # noqa: SIM102
                 if a[2] == self.STUDIO_TYPE_INFOGRAPHIC and a[4] == 3:
                     candidates.append(a)
 
@@ -425,7 +434,7 @@ class DownloadMixin(BaseClient):
         # Filter for completed slide decks (Type 8, Status 3)
         candidates = []
         for a in artifacts:
-            if isinstance(a, list) and len(a) > 5:
+            if isinstance(a, list) and len(a) > 5:  # noqa: SIM102
                 if a[2] == self.STUDIO_TYPE_SLIDE_DECK and a[4] == 3:
                     candidates.append(a)
 
@@ -489,13 +498,13 @@ class DownloadMixin(BaseClient):
         # Filter for completed reports (Type 6, Status 3)
         candidates = []
         for a in artifacts:
-            if isinstance(a, list) and len(a) > 7:
+            if isinstance(a, list) and len(a) > 7:  # noqa: SIM102
                 if a[2] == self.STUDIO_TYPE_REPORT and a[4] == 3:
                     candidates.append(a)
-        
+
         if not candidates:
-             raise ArtifactNotReadyError("report")
-        
+            raise ArtifactNotReadyError("report")
+
         target = None
         if artifact_id:
             target = next((a for a in candidates if a[0] == artifact_id), None)
@@ -508,12 +517,12 @@ class DownloadMixin(BaseClient):
             # Report content is in index 7
             content_wrapper = target[7]
             markdown_content = ""
-            
+
             if isinstance(content_wrapper, list) and len(content_wrapper) > 0:
                 markdown_content = content_wrapper[0]
             elif isinstance(content_wrapper, str):
                 markdown_content = content_wrapper
-            
+
             if not isinstance(markdown_content, str):
                 raise ArtifactParseError("report", details="Invalid content structure")
 
@@ -546,18 +555,20 @@ class DownloadMixin(BaseClient):
         # Mind maps are retrieved via list_mind_maps RPC
         params = [notebook_id]
         result = self._call_rpc(self.RPC_LIST_MIND_MAPS, params, f"/notebook/{notebook_id}")
-        
+
         mind_maps = []
-        if result and isinstance(result, list) and len(result) > 0:
+        if result and isinstance(result, list) and len(result) > 0:  # noqa: SIM102
             if isinstance(result[0], list):
-                 mind_maps = result[0]
-        
+                mind_maps = result[0]
+
         if not mind_maps:
             raise ArtifactNotReadyError("mind_map")
 
         target = None
         if artifact_id:
-            target = next((mm for mm in mind_maps if isinstance(mm, list) and mm[0] == artifact_id), None)
+            target = next(
+                (mm for mm in mind_maps if isinstance(mm, list) and mm[0] == artifact_id), None
+            )
             if not target:
                 raise ArtifactNotFoundError(artifact_id, artifact_type="mind_map")
         else:
@@ -566,15 +577,17 @@ class DownloadMixin(BaseClient):
         try:
             # Mind map JSON is stringified in target[1][1]
             if len(target) > 1 and isinstance(target[1], list) and len(target[1]) > 1:
-                 json_string = target[1][1]
-                 if isinstance(json_string, str):
-                     json_data = json.loads(json_string)
-                     
-                     output = Path(output_path)
-                     output.parent.mkdir(parents=True, exist_ok=True)
-                     output.write_text(json.dumps(json_data, indent=2, ensure_ascii=False), encoding="utf-8")
-                     return str(output)
-            
+                json_string = target[1][1]
+                if isinstance(json_string, str):
+                    json_data = json.loads(json_string)
+
+                    output = Path(output_path)
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        json.dumps(json_data, indent=2, ensure_ascii=False), encoding="utf-8"
+                    )
+                    return str(output)
+
             raise ArtifactParseError("mind_map", details="Invalid structure")
 
         except (IndexError, TypeError, json.JSONDecodeError, AttributeError) as e:
@@ -625,9 +638,7 @@ class DownloadMixin(BaseClient):
         return str(cell).strip()
 
     def _parse_data_table(
-        self,
-        raw_data: list,
-        validate_columns: bool = True
+        self, raw_data: list, validate_columns: bool = True
     ) -> tuple[list[str], list[list[str]]]:
         """Parse rich-text data table into headers and rows.
 
@@ -662,7 +673,7 @@ class DownloadMixin(BaseClient):
             if not isinstance(raw_data, list) or len(raw_data) == 0:
                 raise ArtifactParseError(
                     "data_table",
-                    details="Invalid raw_data: expected non-empty list at artifact[18]"
+                    details="Invalid raw_data: expected non-empty list at artifact[18]",
                 )
 
             # Navigate: raw_data[0]
@@ -670,7 +681,7 @@ class DownloadMixin(BaseClient):
             if not isinstance(layer1, list) or len(layer1) == 0:
                 raise ArtifactParseError(
                     "data_table",
-                    details="Invalid structure at raw_data[0]: expected non-empty list"
+                    details="Invalid structure at raw_data[0]: expected non-empty list",
                 )
 
             # Navigate: [0][0]
@@ -678,7 +689,7 @@ class DownloadMixin(BaseClient):
             if not isinstance(layer2, list) or len(layer2) == 0:
                 raise ArtifactParseError(
                     "data_table",
-                    details="Invalid structure at raw_data[0][0]: expected non-empty list"
+                    details="Invalid structure at raw_data[0][0]: expected non-empty list",
                 )
 
             # Navigate: [0][0][0]
@@ -686,7 +697,7 @@ class DownloadMixin(BaseClient):
             if not isinstance(layer3, list) or len(layer3) == 0:
                 raise ArtifactParseError(
                     "data_table",
-                    details="Invalid structure at raw_data[0][0][0]: expected non-empty list"
+                    details="Invalid structure at raw_data[0][0][0]: expected non-empty list",
                 )
 
             # Navigate: [0][0][0][0]
@@ -694,7 +705,7 @@ class DownloadMixin(BaseClient):
             if not isinstance(layer4, list) or len(layer4) < 5:
                 raise ArtifactParseError(
                     "data_table",
-                    details=f"Invalid structure at raw_data[0][0][0][0]: expected list with at least 5 elements, got {len(layer4) if isinstance(layer4, list) else type(layer4).__name__}"
+                    details=f"Invalid structure at raw_data[0][0][0][0]: expected list with at least 5 elements, got {len(layer4) if isinstance(layer4, list) else type(layer4).__name__}",
                 )
 
             # Navigate: [0][0][0][0][4] - table content section
@@ -702,7 +713,7 @@ class DownloadMixin(BaseClient):
             if not isinstance(table_section, list) or len(table_section) < 3:
                 raise ArtifactParseError(
                     "data_table",
-                    details=f"Invalid table section at raw_data[0][0][0][0][4]: expected list with at least 3 elements, got {len(table_section) if isinstance(table_section, list) else type(table_section).__name__}"
+                    details=f"Invalid table section at raw_data[0][0][0][0][4]: expected list with at least 3 elements, got {len(table_section) if isinstance(table_section, list) else type(table_section).__name__}",
                 )
 
             # Navigate: [0][0][0][0][4][2] - rows array
@@ -710,19 +721,18 @@ class DownloadMixin(BaseClient):
             if not isinstance(rows_array, list):
                 raise ArtifactParseError(
                     "data_table",
-                    details=f"Invalid rows array at raw_data[0][0][0][0][4][2]: expected list, got {type(rows_array).__name__}"
+                    details=f"Invalid rows array at raw_data[0][0][0][0][4][2]: expected list, got {type(rows_array).__name__}",
                 )
 
             if not rows_array:
                 raise ArtifactParseError(
-                    "data_table",
-                    details="Empty rows array - data table contains no data"
+                    "data_table", details="Empty rows array - data table contains no data"
                 )
 
         except IndexError as e:
             raise ArtifactParseError(
                 "data_table",
-                details=f"Structure navigation failed - table may be corrupted or in unexpected format: {e}"
+                details=f"Structure navigation failed - table may be corrupted or in unexpected format: {e}",
             ) from e
 
         # Extract headers and rows
@@ -754,7 +764,7 @@ class DownloadMixin(BaseClient):
                 if not headers or all(not h for h in headers):
                     raise ArtifactParseError(
                         "data_table",
-                        details="First row (headers) is empty - table must have column headers"
+                        details="First row (headers) is empty - table must have column headers",
                     )
             else:
                 # Validate column count if requested
@@ -763,21 +773,20 @@ class DownloadMixin(BaseClient):
                     if len(row_values) < len(headers):
                         row_values.extend([""] * (len(headers) - len(row_values)))
                     else:
-                        row_values = row_values[:len(headers)]
+                        row_values = row_values[: len(headers)]
 
                 rows.append(row_values)
 
         # Final validation
         if not headers:
             raise ArtifactParseError(
-                "data_table",
-                details="Failed to extract headers - first row may be malformed"
+                "data_table", details="Failed to extract headers - first row may be malformed"
             )
 
         if not rows:
             raise ArtifactParseError(
                 "data_table",
-                details=f"No data rows extracted (skipped {skipped_rows} malformed rows)"
+                details=f"No data rows extracted (skipped {skipped_rows} malformed rows)",
             )
 
         return headers, rows
@@ -803,7 +812,7 @@ class DownloadMixin(BaseClient):
         # Filter for completed data tables (Type 9, Status 3)
         candidates = []
         for a in artifacts:
-            if isinstance(a, list) and len(a) > 18:
+            if isinstance(a, list) and len(a) > 18:  # noqa: SIM102
                 if a[2] == self.STUDIO_TYPE_DATA_TABLE and a[4] == 3:
                     candidates.append(a)
 
@@ -827,7 +836,7 @@ class DownloadMixin(BaseClient):
             output = Path(output_path)
             output.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(output, 'w', newline='', encoding='utf-8-sig') as f:
+            with open(output, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
                 writer.writerow(headers)
                 writer.writerows(rows)
@@ -855,9 +864,7 @@ class DownloadMixin(BaseClient):
             ArtifactDownloadError: If API response structure is unexpected.
         """
         result = self._call_rpc(
-            self.RPC_GET_INTERACTIVE_HTML,
-            [artifact_id],
-            f"/notebook/{notebook_id}"
+            self.RPC_GET_INTERACTIVE_HTML, [artifact_id], f"/notebook/{notebook_id}"
         )
 
         if not result:
@@ -881,7 +888,11 @@ class DownloadMixin(BaseClient):
                 return None
 
             html_container = data[9]
-            if not html_container or not isinstance(html_container, list) or len(html_container) == 0:
+            if (
+                not html_container
+                or not isinstance(html_container, list)
+                or len(html_container) == 0
+            ):
                 logger.debug(f"No HTML content in artifact {artifact_id}")
                 return None
 
@@ -893,8 +904,7 @@ class DownloadMixin(BaseClient):
             result_preview = str(result)[:500] if result else "None"
             logger.debug(f"Response preview: {result_preview}...")
             raise ArtifactDownloadError(
-                "interactive",
-                details=f"Unexpected API response structure: {e}"
+                "interactive", details=f"Unexpected API response structure: {e}"
             ) from e
 
     def _extract_app_data(self, html_content: str) -> dict:
@@ -937,7 +947,7 @@ class DownloadMixin(BaseClient):
         match = re.search(
             r'<script[^>]+id=["\']application-data["\'][^>]*>(.*?)</script>',
             html_content,
-            re.DOTALL
+            re.DOTALL,
         )
         if match:
             try:
@@ -948,7 +958,7 @@ class DownloadMixin(BaseClient):
                 logger.debug(f"Failed to parse script tag JSON: {e}")
 
         # Pattern 3: data-state or data-config attributes (additional fallback)
-        for attr in ['data-state', 'data-config', 'data-initial-state']:
+        for attr in ["data-state", "data-config", "data-initial-state"]:
             match = re.search(rf'{attr}="([^"]*(?:\\"[^"]*)*)"', html_content, re.DOTALL)
             if match:
                 encoded_json = match.group(1)
@@ -969,7 +979,7 @@ class DownloadMixin(BaseClient):
             details=(
                 "Could not extract JSON data from HTML. "
                 "Tried: data-app-data, script#application-data, data-state, data-config"
-            )
+            ),
         )
 
     @staticmethod
@@ -1100,8 +1110,7 @@ class DownloadMixin(BaseClient):
         valid_formats = ("json", "markdown", "html")
         if output_format not in valid_formats:
             raise ValueError(
-                f"Invalid output_format: {output_format!r}. "
-                f"Use one of: {', '.join(valid_formats)}"
+                f"Invalid output_format: {output_format!r}. Use one of: {', '.join(valid_formats)}"
             )
 
         # Get all artifacts and filter for completed interactive artifacts
@@ -1110,8 +1119,10 @@ class DownloadMixin(BaseClient):
         # Type 4 (STUDIO_TYPE_FLASHCARDS) covers both quizzes and flashcards
         # Status 3 = completed
         candidates = [
-            a for a in artifacts
-            if isinstance(a, list) and len(a) > 4
+            a
+            for a in artifacts
+            if isinstance(a, list)
+            and len(a) > 4
             and a[2] == self.STUDIO_TYPE_FLASHCARDS
             and a[4] == 3
         ]
@@ -1131,8 +1142,7 @@ class DownloadMixin(BaseClient):
         html_content = self._get_artifact_content(notebook_id, target[0])
         if not html_content:
             raise ArtifactDownloadError(
-                artifact_type,
-                details="Failed to fetch HTML content from API"
+                artifact_type, details="Failed to fetch HTML content from API"
             )
 
         # Extract and parse embedded JSON

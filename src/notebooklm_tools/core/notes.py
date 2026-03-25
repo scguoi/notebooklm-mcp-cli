@@ -46,12 +46,16 @@ class NotesMixin(BaseClient):
         if result and isinstance(result, list) and len(result) > 0:
             # Response: [[note_id, ...]]
             note_data = result[0] if isinstance(result[0], list) else result
-            note_id = note_data[0] if isinstance(note_data, list) and len(note_data) > 0 else note_data
+            note_id = (
+                note_data[0] if isinstance(note_data, list) and len(note_data) > 0 else note_data
+            )
 
             if note_id:
                 # Now update with content if provided
                 if content:
-                    update_result = self.update_note(note_id, content=content, title=title, notebook_id=notebook_id)
+                    update_result = self.update_note(
+                        note_id, content=content, title=title, notebook_id=notebook_id
+                    )
                     if update_result:
                         return {
                             "id": note_id,
@@ -110,19 +114,23 @@ class NotesMixin(BaseClient):
                     if content:
                         try:
                             parsed = json.loads(content)
-                            if isinstance(parsed, dict) and ("children" in parsed or "nodes" in parsed):
+                            if isinstance(parsed, dict) and (
+                                "children" in parsed or "nodes" in parsed
+                            ):
                                 is_mind_map = True
                         except (json.JSONDecodeError, TypeError):
                             pass
 
                     # Only include notes, not mind maps
                     if not is_mind_map:
-                        notes.append({
-                            "id": note_id,
-                            "title": title,
-                            "content": content,
-                            "preview": content[:100] if content else "",
-                        })
+                        notes.append(
+                            {
+                                "id": note_id,
+                                "title": title,
+                                "content": content,
+                                "preview": content[:100] if content else "",
+                            }
+                        )
 
         return notes
 
@@ -195,7 +203,7 @@ class NotesMixin(BaseClient):
             [[[new_content, new_title, [], 0]]],
         ]
 
-        result = self._call_rpc(self.RPC_UPDATE_NOTE, params, f"/notebook/{notebook_id}")
+        self._call_rpc(self.RPC_UPDATE_NOTE, params, f"/notebook/{notebook_id}")
 
         # API returns the updated note data on success (not None as previously thought)
         # If we got here without exception, the update succeeded

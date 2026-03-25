@@ -12,6 +12,7 @@ from .errors import ValidationError
 
 class NotebookQueryResult(TypedDict):
     """Result from a single notebook query."""
+
     notebook_id: str
     notebook_title: str
     answer: str
@@ -21,6 +22,7 @@ class NotebookQueryResult(TypedDict):
 
 class CrossNotebookResult(TypedDict):
     """Aggregated result from cross-notebook query."""
+
     query: str
     results: list[NotebookQueryResult]
     notebooks_queried: int
@@ -170,9 +172,10 @@ def cross_notebook_query(
 
     with ThreadPoolExecutor(max_workers=min(max_concurrent, len(notebooks))) as executor:
         futures = {
-            executor.submit(
-                _query_single_notebook, client, nb_id, nb_title, query_text, timeout
-            ): (nb_id, nb_title)
+            executor.submit(_query_single_notebook, client, nb_id, nb_title, query_text, timeout): (
+                nb_id,
+                nb_title,
+            )
             for nb_id, nb_title in notebooks
         }
 

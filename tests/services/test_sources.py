@@ -1,22 +1,23 @@
 """Tests for services.sources module."""
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from notebooklm_tools.services.errors import ServiceError, ValidationError
 from notebooklm_tools.services.sources import (
-    validate_source_type,
-    resolve_drive_mime_type,
+    VALID_SOURCE_TYPES,
     add_source,
     add_sources,
-    list_drive_sources,
-    sync_drive_sources,
     delete_source,
     delete_sources,
     describe_source,
     get_source_content,
-    VALID_SOURCE_TYPES,
+    list_drive_sources,
+    resolve_drive_mime_type,
+    sync_drive_sources,
+    validate_source_type,
 )
-from notebooklm_tools.services.errors import ValidationError, ServiceError
 
 
 @pytest.fixture
@@ -30,7 +31,13 @@ def mock_client():
     # List/freshness methods
     client.get_notebook_sources_with_types.return_value = [
         {"id": "s1", "title": "Source 1", "source_type_name": "URL", "can_sync": False},
-        {"id": "s2", "title": "Source 2", "source_type_name": "Drive", "can_sync": True, "drive_doc_id": "d1"},
+        {
+            "id": "s2",
+            "title": "Source 2",
+            "source_type_name": "Drive",
+            "can_sync": True,
+            "drive_doc_id": "d1",
+        },
     ]
     client.check_source_freshness.return_value = True
     # Sync/delete/describe/content
@@ -93,7 +100,11 @@ class TestAddSource:
     def test_add_text_source_default_title(self, mock_client):
         add_source(mock_client, "nb-1", "text", text="content")
         mock_client.add_text_source.assert_called_once_with(
-            "nb-1", "content", "Pasted Text", wait=False, wait_timeout=120.0,
+            "nb-1",
+            "content",
+            "Pasted Text",
+            wait=False,
+            wait_timeout=120.0,
         )
 
     def test_add_drive_source(self, mock_client):
@@ -144,7 +155,10 @@ class TestAddSource:
     def test_wait_forwarded(self, mock_client):
         add_source(mock_client, "nb-1", "url", url="http://ex.com", wait=True, wait_timeout=60)
         mock_client.add_url_source.assert_called_once_with(
-            "nb-1", "http://ex.com", wait=True, wait_timeout=60,
+            "nb-1",
+            "http://ex.com",
+            wait=True,
+            wait_timeout=60,
         )
 
 
@@ -250,10 +264,14 @@ class TestAddSources:
             {"id": "s1", "title": "Example"},
             {"id": "s2", "title": "Example Org"},
         ]
-        result = add_sources(mock_client, "nb-1", [
-            {"source_type": "url", "url": "https://example.com"},
-            {"source_type": "url", "url": "https://example.org"},
-        ])
+        result = add_sources(
+            mock_client,
+            "nb-1",
+            [
+                {"source_type": "url", "url": "https://example.com"},
+                {"source_type": "url", "url": "https://example.org"},
+            ],
+        )
         assert result["added_count"] == 2
         assert len(result["results"]) == 2
         assert result["results"][0]["source_id"] == "s1"
@@ -267,10 +285,14 @@ class TestAddSources:
         mock_client.add_url_sources.return_value = [
             {"id": "s1", "title": "Example"},
         ]
-        result = add_sources(mock_client, "nb-1", [
-            {"source_type": "url", "url": "https://example.com"},
-            {"source_type": "text", "text": "hello world"},
-        ])
+        result = add_sources(
+            mock_client,
+            "nb-1",
+            [
+                {"source_type": "url", "url": "https://example.com"},
+                {"source_type": "text", "text": "hello world"},
+            ],
+        )
         assert result["added_count"] == 2
         mock_client.add_url_sources.assert_called_once()
         mock_client.add_text_source.assert_called_once()
@@ -281,39 +303,64 @@ class TestAddSources:
 
     def test_invalid_source_type_raises(self, mock_client):
         with pytest.raises(ValidationError, match="Unknown source type"):
-            add_sources(mock_client, "nb-1", [
-                {"source_type": "podcast", "url": "https://example.com"},
-            ])
+            add_sources(
+                mock_client,
+                "nb-1",
+                [
+                    {"source_type": "podcast", "url": "https://example.com"},
+                ],
+            )
 
     def test_url_missing_raises(self, mock_client):
         with pytest.raises(ValidationError, match="url is required"):
-            add_sources(mock_client, "nb-1", [
-                {"source_type": "url"},
-            ])
+            add_sources(
+                mock_client,
+                "nb-1",
+                [
+                    {"source_type": "url"},
+                ],
+            )
 
     def test_batch_no_id_raises_service_error(self, mock_client):
         mock_client.add_url_sources.return_value = [{}]
         with pytest.raises(ServiceError, match="no ID returned"):
-            add_sources(mock_client, "nb-1", [
-                {"source_type": "url", "url": "https://example.com"},
-            ])
+            add_sources(
+                mock_client,
+                "nb-1",
+                [
+                    {"source_type": "url", "url": "https://example.com"},
+                ],
+            )
 
     def test_batch_api_error_wraps(self, mock_client):
         mock_client.add_url_sources.side_effect = RuntimeError("boom")
         with pytest.raises(ServiceError, match="Failed to batch-add"):
-            add_sources(mock_client, "nb-1", [
-                {"source_type": "url", "url": "https://example.com"},
-            ])
+            add_sources(
+                mock_client,
+                "nb-1",
+                [
+                    {"source_type": "url", "url": "https://example.com"},
+                ],
+            )
 
     def test_wait_forwarded(self, mock_client):
         mock_client.add_url_sources.return_value = [
             {"id": "s1", "title": "Example"},
         ]
-        add_sources(mock_client, "nb-1", [
-            {"source_type": "url", "url": "https://example.com"},
-        ], wait=True, wait_timeout=60)
+        add_sources(
+            mock_client,
+            "nb-1",
+            [
+                {"source_type": "url", "url": "https://example.com"},
+            ],
+            wait=True,
+            wait_timeout=60,
+        )
         mock_client.add_url_sources.assert_called_once_with(
-            "nb-1", ["https://example.com"], wait=True, wait_timeout=60,
+            "nb-1",
+            ["https://example.com"],
+            wait=True,
+            wait_timeout=60,
         )
 
 

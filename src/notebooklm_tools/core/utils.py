@@ -2,7 +2,7 @@
 
 import json
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 # RPC ID to method name mapping for debug logging
@@ -106,7 +106,7 @@ def parse_timestamp(ts_array: list | None) -> str | None:
         seconds = ts_array[0]
         if not isinstance(seconds, (int, float)):
             return None
-        dt = datetime.fromtimestamp(seconds, tz=timezone.utc)
+        dt = datetime.fromtimestamp(seconds, tz=UTC)
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     except (ValueError, OSError, OverflowError):
         return None

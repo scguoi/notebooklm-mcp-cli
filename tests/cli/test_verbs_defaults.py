@@ -35,7 +35,7 @@ class TestReportVerbDefaults:
     """Verify create_report_verb fallback defaults are valid."""
 
     def test_format_default_is_valid(self):
-        assert "Briefing Doc" == constants.REPORT_FORMAT_BRIEFING_DOC
+        assert constants.REPORT_FORMAT_BRIEFING_DOC == "Briefing Doc"
 
 
 class TestSlidesVerbDefaults:
@@ -68,17 +68,20 @@ class TestFlashcardsVerbDefaults:
 class TestAllVerbDefaultsConsistency:
     """Cross-check that verbs.py fallback strings resolve without error."""
 
-    @pytest.mark.parametrize("name,mapper", [
-        ("deep_dive", constants.AUDIO_FORMATS),
-        ("default", constants.AUDIO_LENGTHS),
-        ("explainer", constants.VIDEO_FORMATS),
-        ("auto_select", constants.VIDEO_STYLES),
-        ("detailed_deck", constants.SLIDE_DECK_FORMATS),
-        ("default", constants.SLIDE_DECK_LENGTHS),
-        ("landscape", constants.INFOGRAPHIC_ORIENTATIONS),
-        ("standard", constants.INFOGRAPHIC_DETAILS),
-        ("medium", constants.FLASHCARD_DIFFICULTIES),
-    ])
+    @pytest.mark.parametrize(
+        "name,mapper",
+        [
+            ("deep_dive", constants.AUDIO_FORMATS),
+            ("default", constants.AUDIO_LENGTHS),
+            ("explainer", constants.VIDEO_FORMATS),
+            ("auto_select", constants.VIDEO_STYLES),
+            ("detailed_deck", constants.SLIDE_DECK_FORMATS),
+            ("default", constants.SLIDE_DECK_LENGTHS),
+            ("landscape", constants.INFOGRAPHIC_ORIENTATIONS),
+            ("standard", constants.INFOGRAPHIC_DETAILS),
+            ("medium", constants.FLASHCARD_DIFFICULTIES),
+        ],
+    )
     def test_default_resolves_to_valid_code(self, name, mapper):
         code = mapper.get_code(name)
         assert isinstance(code, int)

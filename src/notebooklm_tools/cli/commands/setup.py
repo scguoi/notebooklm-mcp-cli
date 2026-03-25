@@ -12,10 +12,8 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
 import tomllib
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -39,7 +37,7 @@ MCP_SERVER_CMD = "notebooklm-mcp"
 OPENCODE_MCP_TIMEOUT_MS = 300_000
 
 
-def _find_mcp_server_path() -> Optional[str]:
+def _find_mcp_server_path() -> str | None:
     """Find the full path to the notebooklm-mcp binary."""
     return shutil.which(MCP_SERVER_CMD)
 
@@ -66,7 +64,7 @@ def _is_configured(config: dict, key: str = "notebooklm-mcp") -> bool:
     return key in servers or "notebooklm" in servers
 
 
-def _add_mcp_server(config: dict, key: str = "notebooklm-mcp", extra: Optional[dict] = None) -> dict:
+def _add_mcp_server(config: dict, key: str = "notebooklm-mcp", extra: dict | None = None) -> dict:
     """Add notebooklm-mcp to an mcpServers config dict."""
     config.setdefault("mcpServers", {})
     entry = {"command": MCP_SERVER_CMD, "args": []}
@@ -194,6 +192,7 @@ def _complete_client(ctx, param, incomplete: str) -> list[str]:
 # Setup implementations
 # =============================================================================
 
+
 def _setup_claude_code() -> bool:
     """Add MCP to Claude Code via `claude mcp add`."""
     claude_cmd = shutil.which("claude")
@@ -213,19 +212,19 @@ def _setup_claude_code() -> bool:
             timeout=10,
         )
         if result.returncode == 0:
-            console.print(f"[green]✓[/green] Added to Claude Code (user scope)")
+            console.print("[green]✓[/green] Added to Claude Code (user scope)")
             return True
         elif "already exists" in result.stderr.lower():
-            console.print(f"[green]✓[/green] Already configured in Claude Code")
+            console.print("[green]✓[/green] Already configured in Claude Code")
             return True
         else:
-            console.print(f"[yellow]Warning:[/yellow] claude mcp add returned: {result.stderr.strip()}")
+            console.print(
+                f"[yellow]Warning:[/yellow] claude mcp add returned: {result.stderr.strip()}"
+            )
             return False
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
         console.print(f"[yellow]Warning:[/yellow] Could not run claude command: {e}")
         return False
-
-
 
 
 def _setup_gemini() -> bool:
@@ -234,12 +233,12 @@ def _setup_gemini() -> bool:
     config = _read_json_config(config_path)
 
     if _is_configured(config, "notebooklm"):
-        console.print(f"[green]✓[/green] Already configured in Gemini CLI")
+        console.print("[green]✓[/green] Already configured in Gemini CLI")
         return True
 
     _add_mcp_server(config, key="notebooklm", extra={"trust": True})
     _write_json_config(config_path, config)
-    console.print(f"[green]✓[/green] Added to Gemini CLI")
+    console.print("[green]✓[/green] Added to Gemini CLI")
     console.print(f"  [dim]{config_path}[/dim]")
     return True
 
@@ -266,12 +265,12 @@ def _setup_windsurf() -> bool:
     config = _read_json_config(config_path)
 
     if _is_configured(config):
-        console.print(f"[green]✓[/green] Already configured in Windsurf")
+        console.print("[green]✓[/green] Already configured in Windsurf")
         return True
 
     _add_mcp_server(config)
     _write_json_config(config_path, config)
-    console.print(f"[green]✓[/green] Added to Windsurf")
+    console.print("[green]✓[/green] Added to Windsurf")
     console.print(f"  [dim]{config_path}[/dim]")
     return True
 
@@ -282,12 +281,12 @@ def _setup_cline() -> bool:
     config = _read_json_config(config_path)
 
     if _is_configured(config):
-        console.print(f"[green]✓[/green] Already configured in Cline CLI")
+        console.print("[green]✓[/green] Already configured in Cline CLI")
         return True
 
     _add_mcp_server(config)
     _write_json_config(config_path, config)
-    console.print(f"[green]✓[/green] Added to Cline CLI")
+    console.print("[green]✓[/green] Added to Cline CLI")
     console.print(f"  [dim]{config_path}[/dim]")
     return True
 
@@ -298,12 +297,12 @@ def _setup_antigravity() -> bool:
     config = _read_json_config(config_path)
 
     if _is_configured(config, "notebooklm"):
-        console.print(f"[green]✓[/green] Already configured in Antigravity")
+        console.print("[green]✓[/green] Already configured in Antigravity")
         return True
 
     _add_mcp_server(config, key="notebooklm")
     _write_json_config(config_path, config)
-    console.print(f"[green]✓[/green] Added to Antigravity")
+    console.print("[green]✓[/green] Added to Antigravity")
     console.print(f"  [dim]{config_path}[/dim]")
     return True
 
@@ -320,13 +319,15 @@ def _setup_codex() -> bool:
                 timeout=10,
             )
             if result.returncode == 0:
-                console.print(f"[green]✓[/green] Added to Codex CLI")
+                console.print("[green]✓[/green] Added to Codex CLI")
                 return True
             elif "already exists" in result.stderr.lower():
-                console.print(f"[green]✓[/green] Already configured in Codex CLI")
+                console.print("[green]✓[/green] Already configured in Codex CLI")
                 return True
             else:
-                console.print(f"[yellow]Warning:[/yellow] codex mcp add returned: {result.stderr.strip()}")
+                console.print(
+                    f"[yellow]Warning:[/yellow] codex mcp add returned: {result.stderr.strip()}"
+                )
                 return False
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
             console.print(f"[yellow]Warning:[/yellow] Could not run codex command: {e}")
@@ -341,25 +342,25 @@ def _setup_codex() -> bool:
                 config = tomllib.loads(content)
                 mcp_servers = config.get("mcp_servers", {})
                 if "notebooklm" in mcp_servers or "notebooklm-mcp" in mcp_servers:
-                    console.print(f"[green]✓[/green] Already configured in Codex CLI")
+                    console.print("[green]✓[/green] Already configured in Codex CLI")
                     return True
             except Exception:
                 content = config_path.read_text() if config_path.exists() else ""
         else:
             content = ""
 
-        section = '''
+        section = """
 # NotebookLM MCP server
 [mcp_servers.notebooklm]
 command = "notebooklm-mcp"
 args = []
 enabled = true
-'''
+"""
         new_content = content.rstrip() + "\n" + section if content.strip() else section.lstrip()
 
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(new_content)
-        console.print(f"[green]✓[/green] Added to Codex CLI (config.toml)")
+        console.print("[green]✓[/green] Added to Codex CLI (config.toml)")
         console.print(f"  [dim]{config_path}[/dim]")
         return True
 
@@ -379,7 +380,7 @@ def _setup_opencode() -> bool:
         # Still ensure timeout is set even if server entry already exists
         _ensure_opencode_timeout(config)
         _write_json_config(config_path, config)
-        console.print(f"[green]✓[/green] Already configured in OpenCode")
+        console.print("[green]✓[/green] Already configured in OpenCode")
         return True
 
     mcp["notebooklm"] = {
@@ -394,7 +395,7 @@ def _setup_opencode() -> bool:
     _ensure_opencode_timeout(config)
 
     _write_json_config(config_path, config)
-    console.print(f"[green]✓[/green] Added to OpenCode")
+    console.print("[green]✓[/green] Added to OpenCode")
     console.print(f"  [dim]{config_path}[/dim]")
     return True
 
@@ -419,30 +420,16 @@ def _detect_tool(client_id: str) -> bool:
     """
     checks = {
         "claude-code": lambda: shutil.which("claude") is not None,
-
         "gemini": lambda: (
-            shutil.which("gemini") is not None
-            or _gemini_config_path().parent.exists()
+            shutil.which("gemini") is not None or _gemini_config_path().parent.exists()
         ),
-        "cursor": lambda: (
-            Path.home() / ".cursor"
-        ).exists(),
-        "windsurf": lambda: (
-            _windsurf_config_path().parent.exists()
-        ),
-        "cline": lambda: (
-            Path.home() / ".cline"
-        ).exists(),
-        "antigravity": lambda: (
-            _antigravity_config_path().parent.exists()
-        ),
-        "codex": lambda: (
-            shutil.which("codex") is not None
-            or _codex_config_path().exists()
-        ),
+        "cursor": lambda: (Path.home() / ".cursor").exists(),
+        "windsurf": lambda: _windsurf_config_path().parent.exists(),
+        "cline": lambda: (Path.home() / ".cline").exists(),
+        "antigravity": lambda: _antigravity_config_path().parent.exists(),
+        "codex": lambda: shutil.which("codex") is not None or _codex_config_path().exists(),
         "opencode": lambda: (
-            shutil.which("opencode") is not None
-            or _opencode_config_path().exists()
+            shutil.which("opencode") is not None or _opencode_config_path().exists()
         ),
     }
     check_fn = checks.get(client_id)
@@ -462,7 +449,9 @@ def _is_already_configured(client_id: str) -> bool:
             if claude_cmd:
                 result = subprocess.run(
                     [claude_cmd, "mcp", "list"],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 return "notebooklm" in result.stdout.lower()
             return False
@@ -487,7 +476,9 @@ def _is_already_configured(client_id: str) -> bool:
             if codex_cmd:
                 result = subprocess.run(
                     [codex_cmd, "mcp", "list"],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 return "notebooklm" in result.stdout.lower()
             else:
@@ -530,7 +521,7 @@ def _setup_all() -> None:
     table.add_column("Status", justify="center")
 
     configurable = []  # indices of tools that can be auto-configured
-    for i, (client_id, info, already, has_auto) in enumerate(detected):
+    for i, (client_id, info, already, has_auto) in enumerate(detected):  # noqa: B007
         num = str(i + 1)
         if not has_auto:
             table.add_row(num, info["name"], "[dim]use nlm skill install[/dim]")
@@ -555,17 +546,18 @@ def _setup_all() -> None:
         return
 
     # Interactive selection
-    unconfigured_names = [
-        f"{detected[i][1]['name']} ({detected[i][0]})"
-        for i in configurable
-    ]
+    unconfigured_names = [f"{detected[i][1]['name']} ({detected[i][0]})" for i in configurable]
     console.print(f"\n[bold]Unconfigured tools:[/bold] {', '.join(unconfigured_names)}")
     console.print()
 
-    choice = Prompt.ask(
-        "Configure which tools? [cyan]all/yes[/cyan] / comma-separated numbers / [cyan]none[/cyan]",
-        default="all",
-    ).strip().lower()
+    choice = (
+        Prompt.ask(
+            "Configure which tools? [cyan]all/yes[/cyan] / comma-separated numbers / [cyan]none[/cyan]",
+            default="all",
+        )
+        .strip()
+        .lower()
+    )
 
     if choice == "none" or choice == "n":
         console.print("Cancelled.")
@@ -585,7 +577,9 @@ def _setup_all() -> None:
                 else:
                     console.print(f"[yellow]Skipping #{n} — already configured or invalid[/yellow]")
         except ValueError:
-            console.print("[red]Invalid input. Use 'all', 'none', or comma-separated numbers.[/red]")
+            console.print(
+                "[red]Invalid input. Use 'all', 'none', or comma-separated numbers.[/red]"
+            )
             return
 
     if not selected_indices:
@@ -609,9 +603,8 @@ def _setup_all() -> None:
     for idx in selected_indices:
         client_id, info, _, _has_auto = detected[idx]
         fn = setup_fns.get(client_id)
-        if fn:
-            if fn():
-                success_count += 1
+        if fn and fn():
+            success_count += 1
 
     console.print(f"\n[green]✓ Configured {success_count} tool(s)[/green]")
     if success_count > 0:
@@ -644,23 +637,32 @@ def _setup_json() -> None:
     console.print("[bold]Generate MCP JSON config[/bold]\n")
     console.print("This generates a JSON snippet you can paste into any tool's MCP config.\n")
 
-    config_type = _prompt_numbered("Config type:", [
-        ("uvx", "uvx (no install required)"),
-        ("regular", "Regular (uses installed binary)"),
-    ])
+    config_type = _prompt_numbered(
+        "Config type:",
+        [
+            ("uvx", "uvx (no install required)"),
+            ("regular", "Regular (uses installed binary)"),
+        ],
+    )
 
     use_full_path = False
     if config_type == "regular":
-        path_choice = _prompt_numbered("Command format:", [
-            ("name", "Command name (notebooklm-mcp)"),
-            ("full", "Full path to binary"),
-        ])
+        path_choice = _prompt_numbered(
+            "Command format:",
+            [
+                ("name", "Command name (notebooklm-mcp)"),
+                ("full", "Full path to binary"),
+            ],
+        )
         use_full_path = path_choice == "full"
 
-    config_scope = _prompt_numbered("Config scope:", [
-        ("existing", "Add to existing config (server entry only)"),
-        ("new", "New config file (includes mcpServers wrapper)"),
-    ])
+    config_scope = _prompt_numbered(
+        "Config scope:",
+        [
+            ("existing", "Add to existing config (server entry only)"),
+            ("new", "New config file (includes mcpServers wrapper)"),
+        ],
+    )
 
     # Build the server entry
     if config_type == "uvx":
@@ -692,23 +694,23 @@ def _setup_json() -> None:
     console.print(Syntax(json_str, "json", theme="monokai", padding=1))
     console.print()
 
-    if platform.system() == "Darwin":
-        if Confirm.ask("Copy to clipboard?", default=True):
-            try:
-                subprocess.run(
-                    ["pbcopy"],
-                    input=json_str.encode(),
-                    check=True,
-                    timeout=5,
-                )
-                console.print("[green]✓[/green] Copied to clipboard")
-            except (subprocess.SubprocessError, OSError):
-                console.print("[yellow]Warning:[/yellow] Could not copy to clipboard")
+    if platform.system() == "Darwin" and Confirm.ask("Copy to clipboard?", default=True):
+        try:
+            subprocess.run(
+                ["pbcopy"],
+                input=json_str.encode(),
+                check=True,
+                timeout=5,
+            )
+            console.print("[green]✓[/green] Copied to clipboard")
+        except (subprocess.SubprocessError, OSError):
+            console.print("[yellow]Warning:[/yellow] Could not copy to clipboard")
 
 
 # =============================================================================
 # Commands
 # =============================================================================
+
 
 @app.command("add")
 def setup_add(
@@ -754,7 +756,9 @@ def setup_add(
 
     if not info["has_auto_setup"]:
         console.print(f"[yellow]Note:[/yellow] {info['name']} doesn't use MCP server config.")
-        console.print(f"Use [cyan]nlm skill install {client}[/cyan] to install skill files instead.")
+        console.print(
+            f"Use [cyan]nlm skill install {client}[/cyan] to install skill files instead."
+        )
         raise typer.Exit(0)
 
     setup_fn = {
@@ -810,10 +814,12 @@ def _remove_single(client: str) -> bool:
             try:
                 result = subprocess.run(
                     [claude_cmd, "mcp", "remove", "-s", "user", "notebooklm-mcp"],
-                    capture_output=True, text=True, timeout=10,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
                 if result.returncode == 0:
-                    console.print(f"[green]✓[/green] Removed from Claude Code")
+                    console.print("[green]✓[/green] Removed from Claude Code")
                     return True
                 else:
                     console.print(f"[yellow]Note:[/yellow] {result.stderr.strip()}")
@@ -832,10 +838,12 @@ def _remove_single(client: str) -> bool:
             try:
                 result = subprocess.run(
                     [codex_cmd, "mcp", "remove", "notebooklm-mcp"],
-                    capture_output=True, text=True, timeout=10,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
                 if result.returncode == 0:
-                    console.print(f"[green]✓[/green] Removed from Codex CLI")
+                    console.print("[green]✓[/green] Removed from Codex CLI")
                     return True
                 else:
                     console.print(f"[yellow]Note:[/yellow] {result.stderr.strip()}")
@@ -851,7 +859,7 @@ def _remove_single(client: str) -> bool:
     if client == "opencode":
         config_path = _opencode_config_path()
         if not config_path.exists():
-            console.print(f"[dim]No config file found for OpenCode.[/dim]")
+            console.print("[dim]No config file found for OpenCode.[/dim]")
             return False
         config = _read_json_config(config_path)
         mcp = config.get("mcp", {})
@@ -871,15 +879,14 @@ def _remove_single(client: str) -> bool:
                 else:
                     config["experimental"] = experimental
             _write_json_config(config_path, config)
-            console.print(f"[green]✓[/green] Removed from OpenCode")
+            console.print("[green]✓[/green] Removed from OpenCode")
             return True
         else:
-            console.print(f"[dim]NotebookLM MCP was not configured in OpenCode.[/dim]")
+            console.print("[dim]NotebookLM MCP was not configured in OpenCode.[/dim]")
             return False
 
     # JSON config-based clients
     config_paths = {
-
         "gemini": _gemini_config_path(),
         "cursor": _cursor_config_path(),
         "windsurf": _windsurf_config_path(),
@@ -906,7 +913,9 @@ def _remove_single(client: str) -> bool:
         console.print(f"[green]✓[/green] Removed from {CLIENT_REGISTRY[client]['name']}")
         return True
     else:
-        console.print(f"[dim]NotebookLM MCP was not configured in {CLIENT_REGISTRY[client]['name']}.[/dim]")
+        console.print(
+            f"[dim]NotebookLM MCP was not configured in {CLIENT_REGISTRY[client]['name']}.[/dim]"
+        )
         return False
 
 
@@ -931,7 +940,7 @@ def _remove_all() -> None:
     table.add_column("#", justify="right", style="cyan", width=3)
     table.add_column("Tool", style="bold")
 
-    for i, (client_id, info) in enumerate(configured):
+    for i, (client_id, info) in enumerate(configured):  # noqa: B007
         table.add_row(str(i + 1), info["name"])
 
     console.print(table)
@@ -952,7 +961,7 @@ def _remove_all() -> None:
     # Execute removal
     console.print()
     removed_count = 0
-    for client_id, info in configured:
+    for client_id, info in configured:  # noqa: B007
         if _remove_single(client_id):
             removed_count += 1
 
@@ -983,7 +992,9 @@ def setup_list() -> None:
                 try:
                     result = subprocess.run(
                         [claude_cmd, "mcp", "list"],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
                     if "notebooklm" in result.stdout.lower():
                         status = "[green]✓[/green]"
@@ -1034,7 +1045,9 @@ def setup_list() -> None:
                 try:
                     result = subprocess.run(
                         [codex_cmd, "mcp", "list"],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
                     if "notebooklm" in result.stdout.lower():
                         status = "[green]✓[/green]"

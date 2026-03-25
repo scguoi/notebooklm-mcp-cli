@@ -1,13 +1,21 @@
 """Downloads service — shared validation and routing for artifact downloads."""
 
-from typing import TypedDict, Optional, Callable, Any
+from collections.abc import Callable
+from typing import TypedDict
 
 from ..core.client import NotebookLMClient
-from .errors import ValidationError, ServiceError
+from .errors import ServiceError, ValidationError
 
 VALID_ARTIFACT_TYPES = (
-    "audio", "video", "report", "mind_map", "slide_deck",
-    "infographic", "data_table", "quiz", "flashcards",
+    "audio",
+    "video",
+    "report",
+    "mind_map",
+    "slide_deck",
+    "infographic",
+    "data_table",
+    "quiz",
+    "flashcards",
 )
 
 VALID_OUTPUT_FORMATS = ("json", "markdown", "html")
@@ -27,7 +35,7 @@ DEFAULT_EXTENSIONS = {
     "slide_deck": "pdf",
     "infographic": "png",
     "data_table": "csv",
-    "quiz": "json",        # varies by format
+    "quiz": "json",  # varies by format
     "flashcards": "json",  # varies by format
 }
 
@@ -41,6 +49,7 @@ FORMAT_EXTENSIONS = {
 
 class DownloadResult(TypedDict):
     """Result of a download operation."""
+
     artifact_type: str
     path: str
 
@@ -78,7 +87,7 @@ def download_sync(
     notebook_id: str,
     artifact_type: str,
     output_path: str,
-    artifact_id: Optional[str] = None,
+    artifact_id: str | None = None,
     output_format: str = "json",
 ) -> DownloadResult:
     """Download a non-streaming artifact synchronously.
@@ -107,8 +116,12 @@ def download_sync(
 
     try:
         saved_path = _dispatch_sync(
-            client, notebook_id, artifact_type,
-            output_path, artifact_id, output_format,
+            client,
+            notebook_id,
+            artifact_type,
+            output_path,
+            artifact_id,
+            output_format,
         )
     except (ValidationError, ServiceError):
         raise
@@ -116,7 +129,7 @@ def download_sync(
         raise ServiceError(
             f"Failed to download {artifact_type}: {e}",
             user_message=f"Download failed for {artifact_type}.",
-        )
+        ) from e
 
     if not saved_path:
         raise ServiceError(
@@ -132,9 +145,9 @@ async def download_async(
     notebook_id: str,
     artifact_type: str,
     output_path: str,
-    artifact_id: Optional[str] = None,
+    artifact_id: str | None = None,
     output_format: str = "json",
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Callable[[int, int], None] | None = None,
     slide_deck_format: str = "pdf",
 ) -> DownloadResult:
     """Download a streaming artifact asynchronously.
@@ -165,8 +178,12 @@ async def download_async(
 
     try:
         saved_path = await _dispatch_async(
-            client, notebook_id, artifact_type,
-            output_path, artifact_id, output_format,
+            client,
+            notebook_id,
+            artifact_type,
+            output_path,
+            artifact_id,
+            output_format,
             progress_callback,
             slide_deck_format=slide_deck_format,
         )
@@ -176,7 +193,7 @@ async def download_async(
         raise ServiceError(
             f"Failed to download {artifact_type}: {e}",
             user_message=f"Download failed for {artifact_type}.",
-        )
+        ) from e
 
     if not saved_path:
         raise ServiceError(
@@ -192,7 +209,7 @@ def _dispatch_sync(
     notebook_id: str,
     artifact_type: str,
     output_path: str,
-    artifact_id: Optional[str],
+    artifact_id: str | None,
     output_format: str,
 ) -> str:
     """Route to the correct synchronous client method."""
@@ -214,9 +231,9 @@ async def _dispatch_async(
     notebook_id: str,
     artifact_type: str,
     output_path: str,
-    artifact_id: Optional[str],
+    artifact_id: str | None,
     output_format: str,
-    progress_callback: Optional[Callable[[int, int], None]],
+    progress_callback: Callable[[int, int], None] | None,
     slide_deck_format: str = "pdf",
 ) -> str:
     """Route to the correct async client method."""
@@ -230,32 +247,46 @@ async def _dispatch_async(
     # Streaming types (async client methods)
     elif artifact_type == "audio":
         return await client.download_audio(
-            notebook_id, output_path, artifact_id,
+            notebook_id,
+            output_path,
+            artifact_id,
             progress_callback=progress_callback,
         )
     elif artifact_type == "video":
         return await client.download_video(
-            notebook_id, output_path, artifact_id,
+            notebook_id,
+            output_path,
+            artifact_id,
             progress_callback=progress_callback,
         )
     elif artifact_type == "slide_deck":
         return await client.download_slide_deck(
-            notebook_id, output_path, artifact_id,
+            notebook_id,
+            output_path,
+            artifact_id,
             progress_callback=progress_callback,
             file_format=slide_deck_format,
         )
     elif artifact_type == "infographic":
         return await client.download_infographic(
-            notebook_id, output_path, artifact_id,
+            notebook_id,
+            output_path,
+            artifact_id,
             progress_callback=progress_callback,
         )
     elif artifact_type == "quiz":
         return await client.download_quiz(
-            notebook_id, output_path, artifact_id, output_format,
+            notebook_id,
+            output_path,
+            artifact_id,
+            output_format,
         )
     elif artifact_type == "flashcards":
         return await client.download_flashcards(
-            notebook_id, output_path, artifact_id, output_format,
+            notebook_id,
+            output_path,
+            artifact_id,
+            output_format,
         )
     else:
         raise ValidationError(

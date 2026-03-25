@@ -6,12 +6,13 @@ If the user is not logged in, prompts them to log in via the Chrome window.
 Storage location: ~/.notebooklm-mcp-cli/ (unified for CLI and MCP)
 """
 
+import contextlib
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 # Use logging instead of print to avoid corrupting MCP stdio protocol
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class AuthTokens:
     Only cookies are required. CSRF token and session ID are optional because
     they can be auto-extracted from the NotebookLM page when needed.
     """
+
     cookies: dict[str, str]
     csrf_token: str = ""  # Optional - auto-extracted from page
     session_id: str = ""  # Optional - auto-extracted from page
@@ -66,10 +68,11 @@ class AuthTokens:
 
 def get_cache_path() -> Path:
     """Get the path to the auth cache file.
-    
+
     Uses ~/.notebooklm-mcp-cli/auth.json (unified location).
     """
     from notebooklm_tools.utils.config import get_auth_cache_file
+
     return get_auth_cache_file()
 
 
@@ -89,19 +92,22 @@ def load_cached_tokens() -> AuthTokens | None:
                 cookies=profile.cookies,
                 csrf_token=profile.csrf_token or "",
                 session_id=profile.session_id or "",
-                extracted_at=profile.last_validated.timestamp() if profile.last_validated else time.time()
+                extracted_at=profile.last_validated.timestamp()
+                if profile.last_validated
+                else time.time(),
             )
     except Exception as e:
         logger.debug(f"Failed to load default profile: {e}")
 
     # 2. Fallback to legacy auth cache (with auto-migration)
     cache_path = get_cache_path()
-    
+
     # Auto-migrate from old location if needed
     if not cache_path.exists():
         from notebooklm_tools.utils.config import auto_migrate_if_needed
+
         auto_migrate_if_needed()
-    
+
     if not cache_path.exists():
         return None
 
@@ -190,7 +196,7 @@ def extract_session_id_from_page(html: str) -> str | None:
 
     patterns = [
         r'"FdrFJe":"([^"]+)"',
-        r'f\.sid=(\d+)',
+        r"f\.sid=(\d+)",
     ]
 
     for pattern in patterns:
@@ -238,15 +244,13 @@ REQUIRED_COOKIES = ["SID", "HSID", "SSID", "APISID", "SAPISID"]
 
 def validate_cookies(cookies: dict[str, str]) -> bool:
     """Check if required cookies are present."""
-    for required in REQUIRED_COOKIES:
-        if required not in cookies:
-            return False
-    return True
+    return all(required in cookies for required in REQUIRED_COOKIES)
 
 
 # =============================================================================
 # Multi-Profile Authentication (for CLI)
 # =============================================================================
+
 
 class Profile:
     """Represents an authentication profile (for CLI multi-account support)."""
@@ -258,7 +262,7 @@ class Profile:
         csrf_token: str | None = None,
         session_id: str | None = None,
         email: str | None = None,
-        last_validated: "datetime | None" = None,
+        last_validated: Any = None,
         build_label: str | None = None,
     ) -> None:
         self.name = name
@@ -271,7 +275,6 @@ class Profile:
 
     def to_dict(self) -> dict:
         """Convert profile to dictionary for serialization."""
-        from datetime import datetime
         return {
             "name": self.name,
             "cookies": self.cookies,
@@ -285,16 +288,17 @@ class Profile:
     def from_dict(cls, data: dict) -> "Profile":
         """Create profile from dictionary."""
         from datetime import datetime
+
         last_validated = None
         if data.get("last_validated"):
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 last_validated = datetime.fromisoformat(data["last_validated"])
-            except (ValueError, TypeError):
-                pass
-        
+
         return cls(
             name=data.get("name", "default"),
-            cookies=data.get("cookies", []) if isinstance(data.get("cookies"), list) else data.get("cookies", {}),
+            cookies=data.get("cookies", [])
+            if isinstance(data.get("cookies"), list)
+            else data.get("cookies", {}),
             csrf_token=data.get("csrf_token"),
             session_id=data.get("session_id"),
             email=data.get("email"),
@@ -313,6 +317,7 @@ class AuthManager:
     def profile_dir(self) -> Path:
         """Get the directory for the current profile."""
         from notebooklm_tools.utils.config import get_profile_dir
+
         return get_profile_dir(self.profile_name)
 
     @property
@@ -332,20 +337,21 @@ class AuthManager:
     def load_profile(self, force_reload: bool = False) -> Profile:
         """Load the current profile from disk."""
         from datetime import datetime
+
         from notebooklm_tools.core.exceptions import AuthenticationError, ProfileNotFoundError
-        
+
         if self._profile is not None and not force_reload:
             return self._profile
-        
+
         if not self.profile_exists():
             raise ProfileNotFoundError(self.profile_name)
-        
+
         try:
             cookies = json.loads(self.cookies_file.read_text(encoding="utf-8"))
             metadata = {}
             if self.metadata_file.exists():
                 metadata = json.loads(self.metadata_file.read_text(encoding="utf-8"))
-            
+
             self._profile = Profile(
                 name=self.profile_name,
                 cookies=cookies,
@@ -353,7 +359,8 @@ class AuthManager:
                 session_id=metadata.get("session_id"),
                 email=metadata.get("email"),
                 last_validated=datetime.fromisoformat(metadata["last_validated"])
-                if metadata.get("last_validated") else None,
+                if metadata.get("last_validated")
+                else None,
                 build_label=metadata.get("build_label"),
             )
             return self._profile
@@ -379,6 +386,7 @@ class AuthManager:
                 different email and force is False.
         """
         from datetime import datetime
+
         from notebooklm_tools.core.exceptions import AccountMismatchError
 
         # Guard: check for account mismatch before overwriting
@@ -396,14 +404,14 @@ class AuthManager:
                 pass  # Corrupted metadata, allow overwrite
 
         self.profile_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Set restrictive permissions on the directory
         self.profile_dir.chmod(0o700)
-        
+
         # Save cookies
         self.cookies_file.write_text(json.dumps(cookies, indent=2), encoding="utf-8")
         self.cookies_file.chmod(0o600)
-        
+
         # Save metadata
         metadata = {
             "csrf_token": csrf_token,
@@ -414,7 +422,7 @@ class AuthManager:
         }
         self.metadata_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
         self.metadata_file.chmod(0o600)
-        
+
         self._profile = Profile(
             name=self.profile_name,
             cookies=cookies,
@@ -429,7 +437,9 @@ class AuthManager:
     def delete_profile(self) -> None:
         """Delete the current profile."""
         import shutil
+
         from notebooklm_tools.utils.config import get_profiles_dir
+
         # Get path directly without auto-creating (profile_dir property auto-creates)
         profile_path = get_profiles_dir() / self.profile_name
         if profile_path.exists():
@@ -452,11 +462,13 @@ class AuthManager:
     def get_cookie_header(self) -> str:
         """Get Cookie header value for HTTP requests."""
         from notebooklm_tools.utils.browser import cookies_to_header
+
         return cookies_to_header(self.get_cookies())
 
     def get_headers(self) -> dict[str, str]:
         """Get headers for NotebookLM API requests."""
         from notebooklm_tools.utils.browser import cookies_to_header
+
         profile = self.load_profile()
         headers = {
             "Cookie": cookies_to_header(profile.cookies),
@@ -472,6 +484,7 @@ class AuthManager:
     def list_profiles() -> list[str]:
         """List all available profiles."""
         from notebooklm_tools.utils.config import get_profiles_dir
+
         profiles_dir = get_profiles_dir()
         if not profiles_dir.exists():
             return []
@@ -479,25 +492,28 @@ class AuthManager:
 
     def login_with_file(self, file_path: str | Path) -> Profile:
         """Parse cookies from file and save to profile."""
-        from notebooklm_tools.utils.browser import parse_cookies_from_file, validate_notebooklm_cookies
         from notebooklm_tools.core.exceptions import AuthenticationError
-        
+        from notebooklm_tools.utils.browser import (
+            parse_cookies_from_file,
+            validate_notebooklm_cookies,
+        )
+
         cookies = parse_cookies_from_file(file_path)
-        
+
         if not validate_notebooklm_cookies(cookies):
             raise AuthenticationError(
                 message="Parsed cookies don't appear to be valid for NotebookLM",
                 hint="Make sure the file contains cookies from a NotebookLM session.",
             )
-        
+
         return self.save_profile(cookies)
 
 
 def get_auth_manager(profile: str | None = None) -> AuthManager:
     """Get an AuthManager for the specified or default profile."""
     from notebooklm_tools.utils.config import get_config
-    
+
     if profile is None:
         profile = get_config().auth.default_profile
-    
+
     return AuthManager(profile)

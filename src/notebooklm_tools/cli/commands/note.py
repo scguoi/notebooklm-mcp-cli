@@ -1,15 +1,14 @@
 """Note CLI commands."""
 
-from typing import Optional
-
 import typer
 from rich.console import Console
 from rich.table import Table
 
+from notebooklm_tools.cli.utils import get_client, handle_error
 from notebooklm_tools.core.alias import get_alias_manager
 from notebooklm_tools.core.exceptions import NLMError
-from notebooklm_tools.cli.utils import get_client, handle_error
-from notebooklm_tools.services import notes as notes_service, ServiceError
+from notebooklm_tools.services import ServiceError
+from notebooklm_tools.services import notes as notes_service
 
 console = Console()
 app = typer.Typer(
@@ -24,7 +23,7 @@ def list_notes(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Output IDs only"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """List all notes in a notebook."""
     try:
@@ -36,9 +35,10 @@ def list_notes(
 
         if quiet:
             for note in notes:
-                console.print(note['id'])
+                console.print(note["id"])
         elif json_output:
             import json
+
             print(json.dumps(result, indent=2))
         else:
             if not notes:
@@ -51,16 +51,16 @@ def list_notes(
             table.add_column("Preview", style="white")
 
             for note in notes:
-                preview = note.get('preview', '')[:100]
+                preview = note.get("preview", "")[:100]
                 if len(preview) == 100:
                     preview += "..."
-                table.add_row(note['id'][:8] + "...", note.get('title', 'Untitled'), preview)
+                table.add_row(note["id"][:8] + "...", note.get("title", "Untitled"), preview)
 
             console.print(table)
             console.print(f"\n[dim]Total: {result['count']} note(s)[/dim]")
 
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("create")
@@ -68,7 +68,7 @@ def create_note(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     content: str = typer.Option(..., "--content", "-c", help="Note content"),
     title: str = typer.Option("New Note", "--title", "-t", help="Note title"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create a new note in a notebook."""
     try:
@@ -81,16 +81,16 @@ def create_note(
         console.print(f"  Preview: {result['content_preview']}")
 
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("update")
 def update_note(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     note_id: str = typer.Argument(..., help="Note ID"),
-    content: Optional[str] = typer.Option(None, "--content", "-c", help="New content"),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="New title"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    content: str | None = typer.Option(None, "--content", "-c", help="New content"),
+    title: str | None = typer.Option(None, "--title", "-t", help="New title"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Update a note's content or title."""
     try:
@@ -101,7 +101,7 @@ def update_note(
         console.print(f"[green]✓[/green] {result['message']}")
 
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("delete")
@@ -109,7 +109,7 @@ def delete_note(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     note_id: str = typer.Argument(..., help="Note ID to delete"),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Delete a note permanently."""
     if not confirm:
@@ -126,4 +126,4 @@ def delete_note(
         console.print(f"[green]✓[/green] {result['message']}")
 
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))

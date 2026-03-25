@@ -15,21 +15,21 @@ This mixin provides source-related operations:
 HTTP resumable upload implementation adapted from notebooklm-py.
 """
 
-from pathlib import Path
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
 
-from .base import BaseClient, SOURCE_ADD_TIMEOUT
 from . import constants
+from .base import SOURCE_ADD_TIMEOUT, BaseClient
 from .exceptions import FileUploadError, FileValidationError
 from .retry import execute_with_retry
 
 
 class SourceMixin(BaseClient):
     """Mixin for source management operations.
-    
+
     This class inherits from BaseClient and provides all source-related
     operations. It is designed to be composed with other mixins via
     multiple inheritance in the final NotebookLMClient class.
@@ -49,24 +49,24 @@ class SourceMixin(BaseClient):
         poll_interval: float = 3.0,
     ) -> dict:
         """Wait for a source to finish processing.
-        
+
         Polls the source status until it becomes READY or times out.
-        
+
         Args:
             notebook_id: Notebook containing the source
             source_id: Source to wait for
             timeout: Max seconds to wait (default 120)
             poll_interval: Seconds between status checks (default 3)
-            
+
         Returns:
             The source dict with status='ready'
-            
+
         Raises:
             TimeoutError: If source doesn't become ready within timeout
             RuntimeError: If source processing fails
         """
         start = time.time()
-        
+
         while time.time() - start < timeout:
             sources = self.get_notebook_sources_with_types(notebook_id)
             for src in sources:
@@ -78,17 +78,14 @@ class SourceMixin(BaseClient):
                         raise RuntimeError(f"Source {source_id} failed to process")
                     break
             time.sleep(poll_interval)
-        
+
         raise TimeoutError(f"Source {source_id} not ready after {timeout}s")
 
     def check_source_freshness(self, source_id: str) -> bool | None:
         """Check if a Drive source is fresh (up-to-date with Google Drive)."""
         params = [None, [source_id], [2]]
 
-        result = self._call_rpc(
-            self.RPC_CHECK_FRESHNESS,
-            params
-        )
+        result = self._call_rpc(self.RPC_CHECK_FRESHNESS, params)
 
         # true = fresh, false = stale
         if result and isinstance(result, list) and len(result) > 0:
@@ -102,10 +99,7 @@ class SourceMixin(BaseClient):
         # Sync params: [null, ["source_id"], [2]]
         params = [None, [source_id], [2]]
 
-        result = self._call_rpc(
-            self.RPC_SYNC_DRIVE,
-            params
-        )
+        result = self._call_rpc(self.RPC_SYNC_DRIVE, params)
 
         if result and isinstance(result, list) and len(result) > 0:
             source_data = result[0] if result else []
@@ -168,10 +162,7 @@ class SourceMixin(BaseClient):
         # Note: Extra nesting compared to delete_notebook
         params = [[[source_id]], [2]]
 
-        result = self._call_rpc(
-            self.RPC_DELETE_SOURCE,
-            params
-        )
+        result = self._call_rpc(self.RPC_DELETE_SOURCE, params)
 
         # Response is typically [] on success
         return result is not None
@@ -191,10 +182,7 @@ class SourceMixin(BaseClient):
         # Batch delete params: [[["id1"], ["id2"], ...], [2]]
         params = [[[sid] for sid in source_ids], [2]]
 
-        result = self._call_rpc(
-            self.RPC_DELETE_SOURCE,
-            params
-        )
+        result = self._call_rpc(self.RPC_DELETE_SOURCE, params)
 
         # Response is typically [] on success
         return result is not None
@@ -247,19 +235,20 @@ class SourceMixin(BaseClient):
                         if len(src) > 3 and isinstance(src[3], list) and len(src[3]) > 1:
                             status = src[3][1] if isinstance(src[3][1], int) else status
 
-                        sources.append({
-                            "id": source_id,
-                            "title": title,
-                            "source_type": source_type,
-                            "source_type_name": constants.SOURCE_TYPES.get_name(source_type),
-                            "url": url,
-                            "drive_doc_id": drive_doc_id,
-                            "can_sync": can_sync,
-                            "status": status,
-                        })
+                        sources.append(
+                            {
+                                "id": source_id,
+                                "title": title,
+                                "source_type": source_type,
+                                "source_type_name": constants.SOURCE_TYPES.get_name(source_type),
+                                "url": url,
+                                "drive_doc_id": drive_doc_id,
+                                "can_sync": can_sync,
+                                "status": status,
+                            }
+                        )
 
         return sources
-
 
     def add_url_source(
         self,
@@ -269,13 +258,13 @@ class SourceMixin(BaseClient):
         wait_timeout: float = 120.0,
     ) -> dict | None:
         """Add a URL (website or YouTube) as a source to a notebook.
-        
+
         Args:
             notebook_id: Target notebook ID
             url: URL to add
             wait: If True, block until source is ready
             wait_timeout: Seconds to wait if wait=True (default 120)
-            
+
         Returns:
             Source dict with id and title, or None on failure
         """
@@ -295,16 +284,13 @@ class SourceMixin(BaseClient):
             [source_data],
             notebook_id,
             [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]]
+            [1, None, None, None, None, None, None, None, None, None, [1]],
         ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
             result = self._call_rpc(
-                self.RPC_ADD_SOURCE,
-                params,
-                path=source_path,
-                timeout=SOURCE_ADD_TIMEOUT
+                self.RPC_ADD_SOURCE, params, path=source_path, timeout=SOURCE_ADD_TIMEOUT
             )
         except httpx.TimeoutException:
             return {
@@ -320,10 +306,10 @@ class SourceMixin(BaseClient):
                 source_id = source_data[0][0] if source_data[0] else None
                 source_title = source_data[1] if len(source_data) > 1 else "Untitled"
                 source_result = {"id": source_id, "title": source_title}
-        
+
         if source_result and wait:
             return self.wait_for_source_ready(notebook_id, source_result["id"], wait_timeout)
-        
+
         return source_result
 
     def add_url_sources(
@@ -360,22 +346,21 @@ class SourceMixin(BaseClient):
             source_data_list,
             notebook_id,
             [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]]
+            [1, None, None, None, None, None, None, None, None, None, [1]],
         ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
             result = self._call_rpc(
-                self.RPC_ADD_SOURCE,
-                params,
-                path=source_path,
-                timeout=SOURCE_ADD_TIMEOUT
+                self.RPC_ADD_SOURCE, params, path=source_path, timeout=SOURCE_ADD_TIMEOUT
             )
         except httpx.TimeoutException:
-            return [{
-                "status": "timeout",
-                "message": f"Operation timed out after {SOURCE_ADD_TIMEOUT}s but may have succeeded.",
-            }]
+            return [
+                {
+                    "status": "timeout",
+                    "message": f"Operation timed out after {SOURCE_ADD_TIMEOUT}s but may have succeeded.",
+                }
+            ]
 
         source_results = []
         if result and isinstance(result, list) and len(result) > 0:
@@ -399,7 +384,6 @@ class SourceMixin(BaseClient):
 
         return source_results
 
-
     def add_text_source(
         self,
         notebook_id: str,
@@ -409,7 +393,7 @@ class SourceMixin(BaseClient):
         wait_timeout: float = 120.0,
     ) -> dict | None:
         """Add pasted text as a source to a notebook.
-        
+
         Args:
             notebook_id: Target notebook ID
             text: Text content to add
@@ -423,16 +407,13 @@ class SourceMixin(BaseClient):
             [source_data],
             notebook_id,
             [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]]
+            [1, None, None, None, None, None, None, None, None, None, [1]],
         ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
             result = self._call_rpc(
-                self.RPC_ADD_SOURCE,
-                params,
-                path=source_path,
-                timeout=SOURCE_ADD_TIMEOUT
+                self.RPC_ADD_SOURCE, params, path=source_path, timeout=SOURCE_ADD_TIMEOUT
             )
         except httpx.TimeoutException:
             return {
@@ -448,12 +429,11 @@ class SourceMixin(BaseClient):
                 source_id = source_data[0][0] if source_data[0] else None
                 source_title = source_data[1] if len(source_data) > 1 else title
                 source_result = {"id": source_id, "title": source_title}
-        
+
         if source_result and wait:
             return self.wait_for_source_ready(notebook_id, source_result["id"], wait_timeout)
-        
-        return source_result
 
+        return source_result
 
     def add_drive_source(
         self,
@@ -465,7 +445,7 @@ class SourceMixin(BaseClient):
         wait_timeout: float = 120.0,
     ) -> dict | None:
         """Add a Google Drive document as a source to a notebook.
-        
+
         Args:
             notebook_id: Target notebook ID
             document_id: Google Drive document ID
@@ -476,22 +456,28 @@ class SourceMixin(BaseClient):
         """
         source_data = [
             [document_id, mime_type, 1, title],
-            None, None, None, None, None, None, None, None, None, 1
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
         ]
         params = [
             [source_data],
             notebook_id,
             [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]]
+            [1, None, None, None, None, None, None, None, None, None, [1]],
         ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
             result = self._call_rpc(
-                self.RPC_ADD_SOURCE,
-                params,
-                path=source_path,
-                timeout=SOURCE_ADD_TIMEOUT
+                self.RPC_ADD_SOURCE, params, path=source_path, timeout=SOURCE_ADD_TIMEOUT
             )
         except httpx.TimeoutException:
             return {
@@ -507,12 +493,11 @@ class SourceMixin(BaseClient):
                 source_id = source_data[0][0] if source_data[0] else None
                 source_title = source_data[1] if len(source_data) > 1 else title
                 source_result = {"id": source_id, "title": source_title}
-        
+
         if source_result and wait:
             return self.wait_for_source_ready(notebook_id, source_result["id"], wait_timeout)
-        
-        return source_result
 
+        return source_result
 
     def _register_file_source(self, notebook_id: str, filename: str) -> str:
         """Register a file source intent and get SOURCE_ID.
@@ -538,12 +523,7 @@ class SourceMixin(BaseClient):
         ]
 
         source_path = f"/notebook/{notebook_id}"
-        result = self._call_rpc(
-            self.RPC_ADD_SOURCE_FILE,
-            params,
-            path=source_path,
-            timeout=60.0
-        )
+        result = self._call_rpc(self.RPC_ADD_SOURCE_FILE, params, path=source_path, timeout=60.0)
 
         # Extract SOURCE_ID from nested response
         def extract_id(data):
@@ -599,17 +579,21 @@ class SourceMixin(BaseClient):
             "x-goog-upload-protocol": "resumable",
         }
 
-        body = json.dumps({
-            "PROJECT_ID": notebook_id,
-            "SOURCE_NAME": filename,
-            "SOURCE_ID": source_id,
-        })
+        body = json.dumps(
+            {
+                "PROJECT_ID": notebook_id,
+                "SOURCE_NAME": filename,
+                "SOURCE_ID": source_id,
+            }
+        )
 
         with httpx.Client(timeout=60.0, cookies=cookies) as client:
+
             def _do_request():
                 resp = client.post(url, headers=headers, content=body)
                 resp.raise_for_status()
                 return resp
+
             response = execute_with_retry(_do_request)
 
             upload_url = response.headers.get("x-goog-upload-url")
@@ -650,10 +634,12 @@ class SourceMixin(BaseClient):
                     yield chunk
 
         with httpx.Client(timeout=300.0, cookies=cookies) as client:
+
             def _do_upload():
                 resp = client.post(upload_url, headers=headers, content=file_stream())
                 resp.raise_for_status()
                 return resp
+
             execute_with_retry(_do_upload)
 
     def add_file(
@@ -701,10 +687,23 @@ class SourceMixin(BaseClient):
 
         # Validate file type
         supported_extensions = {
-            '.pdf', '.txt', '.md', '.docx', '.csv',  # Documents
-            '.mp3', '.m4a', '.wav', '.aac', '.ogg', '.opus',  # Audio
-            '.mp4',  # Video
-            '.jpg', '.jpeg', '.png', '.gif', '.webp',  # Images
+            ".pdf",
+            ".txt",
+            ".md",
+            ".docx",
+            ".csv",  # Documents
+            ".mp3",
+            ".m4a",
+            ".wav",
+            ".aac",
+            ".ogg",
+            ".opus",  # Audio
+            ".mp4",  # Video
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",  # Images
         }
         file_extension = file_path.suffix.lower()
         if file_extension not in supported_extensions:
@@ -729,15 +728,14 @@ class SourceMixin(BaseClient):
 
         return result
 
-
     def get_source_guide(self, source_id: str) -> dict[str, Any]:
         """Get AI-generated summary and keywords for a source."""
         result = self._call_rpc(self.RPC_GET_SOURCE_GUIDE, [[[[source_id]]]], "/")
         summary = ""
         keywords = []
 
-        if result and isinstance(result, list):
-            if len(result) > 0 and isinstance(result[0], list):
+        if result and isinstance(result, list):  # noqa: SIM102
+            if len(result) > 0 and isinstance(result[0], list):  # noqa: SIM102
                 if len(result[0]) > 0 and isinstance(result[0][0], list):
                     inner = result[0][0]
 

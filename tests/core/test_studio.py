@@ -61,14 +61,14 @@ class TestStudioMixinMethods:
     def test_create_report_validates_format(self):
         """Test that create_report validates report_format parameter."""
         mixin = StudioMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         with pytest.raises(ValueError, match="Invalid report_format"):
             mixin.create_report("notebook-id", ["source-id"], report_format="invalid")
 
     def test_get_studio_status_is_alias(self):
         """Test that get_studio_status is an alias for poll_studio_status."""
         mixin = StudioMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         # Verify method exists and is callable
         assert callable(mixin.get_studio_status)
         # Method docstring should indicate it's an alias
@@ -81,10 +81,12 @@ class TestCinematicVideoConstant:
     def test_cinematic_constant_value(self):
         """VIDEO_FORMAT_CINEMATIC should be 3."""
         from notebooklm_tools.core import constants
+
         assert constants.VIDEO_FORMAT_CINEMATIC == 3
 
     def test_cinematic_code_mapper_lookup(self):
         """CodeMapper should resolve 'cinematic' to 3 and back."""
         from notebooklm_tools.core import constants
+
         assert constants.VIDEO_FORMATS.get_code("cinematic") == 3
         assert constants.VIDEO_FORMATS.get_name(3) == "cinematic"

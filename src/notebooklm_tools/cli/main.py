@@ -1,24 +1,31 @@
 """Main CLI application for NotebookLM Tools."""
 
+import contextlib
 import logging
-from typing import Optional
 
 import typer
-from notebooklm_tools.cli.utils import make_console
 
 from notebooklm_tools import __version__
-from notebooklm_tools.cli.commands.chat import app as chat_app
-from notebooklm_tools.cli.commands.notebook import app as notebook_app
-from notebooklm_tools.cli.commands.note import app as note_app
-from notebooklm_tools.cli.commands.research import app as research_app
-from notebooklm_tools.cli.commands.source import app as source_app
 from notebooklm_tools.cli.commands.alias import app as alias_app
+from notebooklm_tools.cli.commands.batch import app as batch_app
+from notebooklm_tools.cli.commands.chat import app as chat_app
 from notebooklm_tools.cli.commands.config import app as config_app
-from notebooklm_tools.cli.commands.skill import app as skill_app
-from notebooklm_tools.cli.commands.setup import app as setup_app
+from notebooklm_tools.cli.commands.cross import app as cross_app
 from notebooklm_tools.cli.commands.doctor import app as doctor_app
+from notebooklm_tools.cli.commands.download import app as download_app
+from notebooklm_tools.cli.commands.export import app as export_app
+from notebooklm_tools.cli.commands.note import app as note_app
+from notebooklm_tools.cli.commands.notebook import app as notebook_app
+from notebooklm_tools.cli.commands.pipeline import app as pipeline_app
+from notebooklm_tools.cli.commands.research import app as research_app
+from notebooklm_tools.cli.commands.setup import app as setup_app
+from notebooklm_tools.cli.commands.share import app as share_app
+from notebooklm_tools.cli.commands.skill import app as skill_app
+from notebooklm_tools.cli.commands.source import app as source_app
 from notebooklm_tools.cli.commands.studio import (
     app as studio_app,
+)
+from notebooklm_tools.cli.commands.studio import (
     audio_app,
     data_table_app,
     flashcards_app,
@@ -29,33 +36,28 @@ from notebooklm_tools.cli.commands.studio import (
     slides_app,
     video_app,
 )
-from notebooklm_tools.cli.commands.download import app as download_app
-from notebooklm_tools.cli.commands.share import app as share_app
-from notebooklm_tools.cli.commands.export import app as export_app
-from notebooklm_tools.cli.commands.batch import app as batch_app
-from notebooklm_tools.cli.commands.cross import app as cross_app
-from notebooklm_tools.cli.commands.pipeline import app as pipeline_app
 from notebooklm_tools.cli.commands.tag import app as tag_app
 from notebooklm_tools.cli.commands.verbs import (
-    create_app,
-    list_app,
-    get_app,
-    delete_app,
     add_app,
-    rename_app,
-    status_app,
-    describe_app,
-    query_app,
-    sync_app,
-    content_app,
-    stale_app,
     configure_app,
+    content_app,
+    create_app,
+    delete_app,
+    describe_app,
+    get_app,
+    install_app,
+    list_app,
+    query_app,
+    rename_app,
     set_app,
     show_app,
-    install_app,
+    stale_app,
+    status_app,
+    sync_app,
     uninstall_app,
     update_app,
 )
+from notebooklm_tools.cli.utils import make_console
 
 console = make_console()
 
@@ -88,35 +90,46 @@ profile_app = typer.Typer(
 def login_callback(
     ctx: typer.Context,
     manual: bool = typer.Option(
-        False, "--manual", "-m",
+        False,
+        "--manual",
+        "-m",
         help="Manually provide cookies from a file",
     ),
     check: bool = typer.Option(
-        False, "--check",
+        False,
+        "--check",
         help="Only check if current auth is valid",
     ),
-    profile: Optional[str] = typer.Option(
-        None, "--profile", "-p",
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        "-p",
         help="Profile name (uses config default if not specified)",
     ),
-    cookie_file: Optional[str] = typer.Option(
-        None, "--file", "-f",
+    cookie_file: str | None = typer.Option(
+        None,
+        "--file",
+        "-f",
         help="Path to file containing cookies (for manual mode)",
     ),
     provider: str = typer.Option(
-        "builtin", "--provider",
+        "builtin",
+        "--provider",
         help="Auth provider: builtin (default) or openclaw",
     ),
     cdp_url: str = typer.Option(
-        "http://127.0.0.1:18800", "--cdp-url",
+        "http://127.0.0.1:18800",
+        "--cdp-url",
         help="CDP endpoint URL for external provider mode",
     ),
     force: bool = typer.Option(
-        False, "--force",
+        False,
+        "--force",
         help="Force overwrite even if profile has credentials for a different account",
     ),
     clear: bool = typer.Option(
-        False, "--clear",
+        False,
+        "--clear",
         help="Delete the localized Chrome profile data before logging in, to switch Google accounts",
     ),
 ) -> None:
@@ -128,7 +141,7 @@ def login_callback(
     Use --check to validate existing credentials.
     Use --provider openclaw --cdp-url <url> to read auth from an existing
     OpenClaw-managed browser CDP endpoint.
-    
+
     To switch active accounts, run `nlm login switch <profile>`.
     """
     from notebooklm_tools.core.auth import AuthManager
@@ -178,7 +191,7 @@ def login_callback(
                 build_label=p.build_label,
             )
 
-            console.print(f"[green]✓[/green] Authentication valid!")
+            console.print("[green]✓[/green] Authentication valid!")
             console.print(f"  Profile: {p.name}")
             console.print(f"  Notebooks found: {len(notebooks)}")
             if p.email:
@@ -187,7 +200,7 @@ def login_callback(
             console.print(f"[red]✗[/red] Authentication failed: {e.message}")
             if e.hint:
                 console.print(f"[dim]{e.hint}[/dim]")
-            raise typer.Exit(2)
+            raise typer.Exit(2) from e
         return
 
     if manual:
@@ -198,15 +211,15 @@ def login_callback(
                 default="~/.nlm/cookies.txt",
             )
         try:
-            profile_obj = auth.login_with_file(cookie_file)
-            console.print(f"[green]✓[/green] Successfully authenticated!")
+            auth.login_with_file(cookie_file)
+            console.print("[green]✓[/green] Successfully authenticated!")
             console.print(f"  Profile saved: {profile}")
             console.print(f"  Credentials saved to: {auth.profile_dir}")
         except NLMError as e:
             console.print(f"[red]Error:[/red] {e.message}")
             if e.hint:
                 console.print(f"\n[dim]Hint: {e.hint}[/dim]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         return
 
     provider = (provider or "builtin").strip().lower()
@@ -236,13 +249,18 @@ def login_callback(
         else:
             # Default: builtin CDP mode - managed Chrome profile
             from notebooklm_tools.utils.cdp import get_browser_display_name, get_chrome_path
+
             # Detect browser early so messages show the correct name
             get_chrome_path()
             browser_name = get_browser_display_name()
             console.print(f"[bold]Launching {browser_name} for authentication...[/bold]")
             console.print("[dim]Using Chrome DevTools Protocol[/dim]\n")
 
-            from notebooklm_tools.utils.config import check_migration_sources, run_migration, get_storage_dir
+            from notebooklm_tools.utils.config import (
+                check_migration_sources,
+                get_storage_dir,
+                run_migration,
+            )
 
             # Check if we need to migrate from legacy packages
             # IMPORTANT: Don't use get_chrome_profile_dir() here as it creates the directory,
@@ -302,7 +320,7 @@ def login_callback(
             console.print(f"[dim]Closing {get_browser_display_name()}...[/dim]")
             terminate_chrome()
 
-        console.print(f"\n[green]✓[/green] Successfully authenticated!")
+        console.print("\n[green]✓[/green] Successfully authenticated!")
         console.print(f"  Profile: {profile}")
         console.print(f"  Provider: {provider}")
         console.print(f"  Cookies: {len(cookies)} extracted")
@@ -321,13 +339,13 @@ def login_callback(
                 f"([bold]{result.get('email', '?')}[/bold] instead of "
                 f"[bold]{e.stored_email}[/bold])."
             )
-            console.print(f"[dim]Clearing stale browser session and relaunching {get_browser_display_name()}...[/dim]\n")
+            console.print(
+                f"[dim]Clearing stale browser session and relaunching {get_browser_display_name()}...[/dim]\n"
+            )
 
             # Close the mismatch Chrome
-            try:
+            with contextlib.suppress(Exception):
                 terminate_chrome()
-            except Exception:
-                pass
 
             # Retry with cleared Chrome profile
             try:
@@ -359,11 +377,13 @@ def login_callback(
                     console.print(f"[dim]Closing {get_browser_display_name()}...[/dim]")
                     terminate_chrome()
 
-                console.print(f"\n[green]✓[/green] Successfully authenticated!")
+                console.print("\n[green]✓[/green] Successfully authenticated!")
                 console.print(f"  Profile: {profile}")
                 console.print(f"  Provider: {provider}")
                 console.print(f"  Cookies: {len(cookies)} extracted")
-                console.print(f"  CSRF Token: {'Yes' if csrf_token else 'No (will be auto-extracted)'}")
+                console.print(
+                    f"  CSRF Token: {'Yes' if csrf_token else 'No (will be auto-extracted)'}"
+                )
                 if email:
                     console.print(f"  Account: {email}")
                 console.print(f"  Credentials saved to: {auth.profile_dir}")
@@ -371,16 +391,16 @@ def login_callback(
                 console.print(f"\n[red]Error on retry:[/red] {retry_err.message}")
                 if retry_err.hint:
                     console.print(f"\n[dim]Hint: {retry_err.hint}[/dim]")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from retry_err
         else:
             console.print(f"\n[red]Error:[/red] {e.message}")
             console.print(f"\n[yellow]Hint:[/yellow] {e.hint}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
     except NLMError as e:
         console.print(f"\n[red]Error:[/red] {e.message}")
         if e.hint:
             console.print(f"\n[dim]Hint: {e.hint}[/dim]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @profile_app.command("list")
@@ -410,7 +430,9 @@ def profile_list() -> None:
 def profile_delete(
     profile: str = typer.Argument(..., help="Profile name to delete"),
     confirm: bool = typer.Option(
-        False, "--confirm", "-y",
+        False,
+        "--confirm",
+        "-y",
         help="Skip confirmation prompt",
     ),
 ) -> None:
@@ -476,7 +498,7 @@ def profile_rename(
         console.print(f"[red]Error:[/red] {e.message}")
         if e.hint:
             console.print(f"\n[dim]Hint: {e.hint}[/dim]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @login_app.command("switch")
@@ -578,21 +600,25 @@ app.add_typer(update_app, name="update", help="Update resources (skills)")
 def main(
     ctx: typer.Context,
     version: bool = typer.Option(
-        False, "--version", "-v",
+        False,
+        "--version",
+        "-v",
         help="Show version and exit",
     ),
     ai: bool = typer.Option(
-        False, "--ai",
+        False,
+        "--ai",
         help="Output AI-friendly documentation for this CLI",
     ),
     debug: bool = typer.Option(
-        False, "--debug",
+        False,
+        "--debug",
         help="Enable debug logging (shows raw API responses)",
     ),
 ) -> None:
     """
     NLM - Command-line interface for Google NotebookLM.
-    
+
     Use 'nlm <command> --help' for help on specific commands.
     """
     if debug:
@@ -604,19 +630,21 @@ def main(
 
     if version:
         from notebooklm_tools.cli.utils import check_for_updates
+
         console.print(f"nlm version {__version__}")
-        
+
         # Check for updates when showing version
         update_available, latest = check_for_updates()
         if not (update_available and latest):
-            console.print(f"[dim]You are on the latest version.[/dim]")
+            console.print("[dim]You are on the latest version.[/dim]")
         raise typer.Exit()
-    
+
     if ai:
         from notebooklm_tools.cli.ai_docs import print_ai_docs
+
         print_ai_docs()
         raise typer.Exit()
-    
+
     # Show help if no command provided
     if ctx.invoked_subcommand is None:
         console.print(ctx.get_help())
@@ -625,22 +653,22 @@ def main(
 def cli_main():
     """Main CLI entry point with error handling."""
     import sys
+
     try:
         app()
     except Exception as e:
         # Import here to avoid circular dependencies
+        from notebooklm_tools.core.errors import ClientAuthenticationError
         from notebooklm_tools.core.exceptions import (
             AuthenticationError,
             NLMError,
         )
-        from notebooklm_tools.core.errors import ClientAuthenticationError
-
 
         # Handle authentication errors cleanly
         if isinstance(e, (AuthenticationError, ClientAuthenticationError)):
-            console.print(f"\n[red]✗ Authentication Error[/red]")
+            console.print("\n[red]✗ Authentication Error[/red]")
             console.print(f"  {str(e)}")
-            console.print(f"\n[yellow]→[/yellow] Run [cyan]nlm login[/cyan] to re-authenticate\n")
+            console.print("\n[yellow]→[/yellow] Run [cyan]nlm login[/cyan] to re-authenticate\n")
             sys.exit(1)
 
         # Handle other NLM errors cleanly
@@ -656,6 +684,7 @@ def cli_main():
     finally:
         # Check for updates after command execution (runs even on typer.Exit)
         from notebooklm_tools.cli.utils import print_update_notification
+
         print_update_notification()
 
 

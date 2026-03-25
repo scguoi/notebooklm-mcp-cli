@@ -11,9 +11,10 @@ Centralizes:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Optional, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from notebooklm_tools.core import constants
+
 from .errors import ServiceError, ValidationError
 
 if TYPE_CHECKING:
@@ -21,16 +22,27 @@ if TYPE_CHECKING:
 
 # ---------- Constants ----------
 
-VALID_ARTIFACT_TYPES = frozenset([
-    "audio", "video", "infographic", "slide_deck", "report",
-    "flashcards", "quiz", "data_table", "mind_map",
-])
+VALID_ARTIFACT_TYPES = frozenset(
+    [
+        "audio",
+        "video",
+        "infographic",
+        "slide_deck",
+        "report",
+        "flashcards",
+        "quiz",
+        "data_table",
+        "mind_map",
+    ]
+)
 
 
 # ---------- TypedDicts ----------
 
+
 class CreateResult(TypedDict):
     """Result of creating a studio artifact."""
+
     artifact_type: str
     artifact_id: str
     status: str
@@ -39,6 +51,7 @@ class CreateResult(TypedDict):
 
 class MindMapResult(TypedDict):
     """Result of creating a mind map."""
+
     artifact_type: str
     artifact_id: str
     title: str
@@ -50,16 +63,18 @@ class MindMapResult(TypedDict):
 
 class ArtifactInfo(TypedDict, total=False):
     """Studio artifact info."""
+
     artifact_id: str
     type: str
     title: str
     status: str
-    created_at: Optional[str]
-    url: Optional[str]
+    created_at: str | None
+    url: str | None
 
 
 class StatusResult(TypedDict):
     """Result of polling studio status."""
+
     artifacts: list[ArtifactInfo]
     total: int
     completed: int
@@ -68,20 +83,23 @@ class StatusResult(TypedDict):
 
 class RenameResult(TypedDict):
     """Result of renaming an artifact."""
+
     artifact_id: str
     new_title: str
 
 
 class ReviseResult(TypedDict):
     """Result of revising a slide deck."""
-    artifact_type: str          # "slide_deck"
-    artifact_id: str            # new artifact UUID
-    original_artifact_id: str   # original artifact UUID
-    status: str                 # "in_progress"
+
+    artifact_type: str  # "slide_deck"
+    artifact_id: str  # new artifact UUID
+    original_artifact_id: str  # original artifact UUID
+    status: str  # "in_progress"
     message: str
 
 
 # ---------- Validation ----------
+
 
 def validate_artifact_type(artifact_type: str) -> None:
     """Validate that artifact_type is one of the supported types.
@@ -115,13 +133,13 @@ def resolve_code(mapper: constants.CodeMapper, name: str, label: str) -> int:
     except ValueError:
         raise ValidationError(
             f"Unknown {label} '{name}'. Valid options: {', '.join(mapper.names)}",
-        )
+        ) from None
 
 
 def _resolve_source_ids(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     notebook_id: str,
-    source_ids: Optional[list[str]],
+    source_ids: list[str] | None,
 ) -> list[str]:
     """Resolve source IDs: use provided list or fetch all from notebook.
 
@@ -138,11 +156,11 @@ def _resolve_source_ids(
         raise ServiceError(
             f"Failed to fetch sources: {e}",
             user_message="Could not retrieve notebook sources.",
-        )
+        ) from e
 
     if not ids:
         raise ValidationError(
-            f"No sources found in notebook. Add sources before creating artifacts.",
+            "No sources found in notebook. Add sources before creating artifacts.",
         )
     return ids
 
@@ -169,12 +187,13 @@ def _validate_result(result: dict | None, artifact_type: str) -> str:
 
 # ---------- Creation ----------
 
+
 def create_artifact(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     notebook_id: str,
     artifact_type: str,
     *,
-    source_ids: Optional[list[str]] = None,
+    source_ids: list[str] | None = None,
     # Audio
     audio_format: str = "deep_dive",
     audio_length: str = "default",
@@ -222,15 +241,25 @@ def create_artifact(
             return _create_mind_map(client, notebook_id, resolved_ids, title)
 
         result = _dispatch_create(
-            client, notebook_id, artifact_type, resolved_ids,
-            audio_format=audio_format, audio_length=audio_length,
-            video_format=video_format, visual_style=visual_style,
-            orientation=orientation, detail_level=detail_level,
+            client,
+            notebook_id,
+            artifact_type,
+            resolved_ids,
+            audio_format=audio_format,
+            audio_length=audio_length,
+            video_format=video_format,
+            visual_style=visual_style,
+            orientation=orientation,
+            detail_level=detail_level,
             infographic_style=infographic_style,
-            slide_format=slide_format, slide_length=slide_length,
-            report_format=report_format, custom_prompt=custom_prompt,
-            question_count=question_count, difficulty=difficulty,
-            language=language, focus_prompt=focus_prompt,
+            slide_format=slide_format,
+            slide_length=slide_length,
+            report_format=report_format,
+            custom_prompt=custom_prompt,
+            question_count=question_count,
+            difficulty=difficulty,
+            language=language,
+            focus_prompt=focus_prompt,
             description=description,
         )
 
@@ -248,11 +277,11 @@ def create_artifact(
         raise ServiceError(
             f"Failed to create {artifact_type}: {e}",
             user_message=f"Could not create {artifact_type.replace('_', ' ')}.",
-        )
+        ) from e
 
 
 def _dispatch_create(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     notebook_id: str,
     artifact_type: str,
     source_ids: list[str],
@@ -264,60 +293,91 @@ def _dispatch_create(
         format_code = resolve_code(constants.AUDIO_FORMATS, kwargs["audio_format"], "audio format")
         length_code = resolve_code(constants.AUDIO_LENGTHS, kwargs["audio_length"], "audio length")
         return client.create_audio_overview(
-            notebook_id, source_ids=source_ids,
-            format_code=format_code, length_code=length_code,
-            language=kwargs["language"], focus_prompt=kwargs["focus_prompt"],
+            notebook_id,
+            source_ids=source_ids,
+            format_code=format_code,
+            length_code=length_code,
+            language=kwargs["language"],
+            focus_prompt=kwargs["focus_prompt"],
         )
 
     elif artifact_type == "video":
         format_code = resolve_code(constants.VIDEO_FORMATS, kwargs["video_format"], "video format")
         style_code = resolve_code(constants.VIDEO_STYLES, kwargs["visual_style"], "visual style")
         return client.create_video_overview(
-            notebook_id, source_ids=source_ids,
-            format_code=format_code, visual_style_code=style_code,
-            language=kwargs["language"], focus_prompt=kwargs["focus_prompt"],
+            notebook_id,
+            source_ids=source_ids,
+            format_code=format_code,
+            visual_style_code=style_code,
+            language=kwargs["language"],
+            focus_prompt=kwargs["focus_prompt"],
         )
 
     elif artifact_type == "infographic":
-        orientation_code = resolve_code(constants.INFOGRAPHIC_ORIENTATIONS, kwargs["orientation"], "orientation")
-        detail_code = resolve_code(constants.INFOGRAPHIC_DETAILS, kwargs["detail_level"], "detail level")
-        style_code = resolve_code(constants.INFOGRAPHIC_STYLES, kwargs.get("infographic_style", "auto_select"), "visual style")
+        orientation_code = resolve_code(
+            constants.INFOGRAPHIC_ORIENTATIONS, kwargs["orientation"], "orientation"
+        )
+        detail_code = resolve_code(
+            constants.INFOGRAPHIC_DETAILS, kwargs["detail_level"], "detail level"
+        )
+        style_code = resolve_code(
+            constants.INFOGRAPHIC_STYLES,
+            kwargs.get("infographic_style", "auto_select"),
+            "visual style",
+        )
         return client.create_infographic(
-            notebook_id, source_ids=source_ids,
-            orientation_code=orientation_code, detail_level_code=detail_code,
+            notebook_id,
+            source_ids=source_ids,
+            orientation_code=orientation_code,
+            detail_level_code=detail_code,
             visual_style_code=style_code,
-            language=kwargs["language"], focus_prompt=kwargs["focus_prompt"],
+            language=kwargs["language"],
+            focus_prompt=kwargs["focus_prompt"],
         )
 
     elif artifact_type == "slide_deck":
-        format_code = resolve_code(constants.SLIDE_DECK_FORMATS, kwargs["slide_format"], "slide format")
-        length_code = resolve_code(constants.SLIDE_DECK_LENGTHS, kwargs["slide_length"], "slide length")
+        format_code = resolve_code(
+            constants.SLIDE_DECK_FORMATS, kwargs["slide_format"], "slide format"
+        )
+        length_code = resolve_code(
+            constants.SLIDE_DECK_LENGTHS, kwargs["slide_length"], "slide length"
+        )
         return client.create_slide_deck(
-            notebook_id, source_ids=source_ids,
-            format_code=format_code, length_code=length_code,
-            language=kwargs["language"], focus_prompt=kwargs["focus_prompt"],
+            notebook_id,
+            source_ids=source_ids,
+            format_code=format_code,
+            length_code=length_code,
+            language=kwargs["language"],
+            focus_prompt=kwargs["focus_prompt"],
         )
 
     elif artifact_type == "report":
         return client.create_report(
-            notebook_id, source_ids=source_ids,
+            notebook_id,
+            source_ids=source_ids,
             report_format=kwargs["report_format"],
             custom_prompt=kwargs["custom_prompt"],
             language=kwargs["language"],
         )
 
     elif artifact_type == "flashcards":
-        difficulty_code = resolve_code(constants.FLASHCARD_DIFFICULTIES, kwargs["difficulty"], "difficulty")
+        difficulty_code = resolve_code(
+            constants.FLASHCARD_DIFFICULTIES, kwargs["difficulty"], "difficulty"
+        )
         return client.create_flashcards(
-            notebook_id, source_ids=source_ids,
+            notebook_id,
+            source_ids=source_ids,
             difficulty_code=difficulty_code,
             focus_prompt=kwargs["focus_prompt"],
         )
 
     elif artifact_type == "quiz":
-        difficulty_code = resolve_code(constants.FLASHCARD_DIFFICULTIES, kwargs["difficulty"], "difficulty")
+        difficulty_code = resolve_code(
+            constants.FLASHCARD_DIFFICULTIES, kwargs["difficulty"], "difficulty"
+        )
         return client.create_quiz(
-            notebook_id, source_ids=source_ids,
+            notebook_id,
+            source_ids=source_ids,
             question_count=kwargs["question_count"],
             difficulty=difficulty_code,
             focus_prompt=kwargs["focus_prompt"],
@@ -327,7 +387,8 @@ def _dispatch_create(
         if not kwargs["description"]:
             raise ValidationError("description is required for data_table")
         return client.create_data_table(
-            notebook_id, source_ids=source_ids,
+            notebook_id,
+            source_ids=source_ids,
             description=kwargs["description"],
             language=kwargs["language"],
         )
@@ -338,7 +399,7 @@ def _dispatch_create(
 
 
 def _create_mind_map(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     notebook_id: str,
     source_ids: list[str],
     title: str,
@@ -349,7 +410,8 @@ def _create_mind_map(
         ServiceError: If generation or save fails
     """
     gen_result = client.generate_mind_map(
-        notebook_id=notebook_id, source_ids=source_ids,
+        notebook_id=notebook_id,
+        source_ids=source_ids,
     )
     if not gen_result or not gen_result.get("mind_map_json"):
         raise ServiceError(
@@ -391,8 +453,9 @@ def _create_mind_map(
 
 # ---------- Status ----------
 
+
 def get_studio_status(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     notebook_id: str,
 ) -> StatusResult:
     """Get status of all studio artifacts including mind maps.
@@ -409,19 +472,21 @@ def get_studio_status(
         raise ServiceError(
             f"Failed to poll studio status: {e}",
             user_message="Could not retrieve studio status.",
-        )
+        ) from e
 
     # Also fetch mind maps
     try:
         mind_maps = client.list_mind_maps(notebook_id)
         for mm in mind_maps:
-            artifacts.append({
-                "artifact_id": mm.get("mind_map_id"),
-                "type": "mind_map",
-                "title": mm.get("title", "Mind Map"),
-                "status": "completed",
-                "created_at": mm.get("created_at"),
-            })
+            artifacts.append(
+                {
+                    "artifact_id": mm.get("mind_map_id"),
+                    "type": "mind_map",
+                    "title": mm.get("title", "Mind Map"),
+                    "status": "completed",
+                    "created_at": mm.get("created_at"),
+                }
+            )
     except Exception:
         pass  # Mind maps are optional
 
@@ -438,8 +503,9 @@ def get_studio_status(
 
 # ---------- Rename ----------
 
+
 def rename_artifact(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     artifact_id: str,
     new_title: str,
 ) -> RenameResult:
@@ -471,13 +537,14 @@ def rename_artifact(
         raise ServiceError(
             f"Failed to rename artifact: {e}",
             user_message="Could not rename artifact.",
-        )
+        ) from e
 
 
 # ---------- Delete ----------
 
+
 def delete_artifact(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     artifact_id: str,
     notebook_id: str,
 ) -> None:
@@ -499,13 +566,14 @@ def delete_artifact(
         raise ServiceError(
             f"Failed to delete artifact: {e}",
             user_message="Could not delete artifact.",
-        )
+        ) from e
 
 
 # ---------- Revise ----------
 
+
 def revise_artifact(
-    client: "NotebookLMClient",
+    client: NotebookLMClient,
     artifact_id: str,
     slide_instructions: list[dict],
 ) -> ReviseResult:
@@ -542,9 +610,7 @@ def revise_artifact(
                 f"Slide numbers are 1-based (slide 1 = first slide)."
             )
         if not instruction:
-            raise ValidationError(
-                f"Instruction for slide {slide_num} must not be empty."
-            )
+            raise ValidationError(f"Instruction for slide {slide_num} must not be empty.")
         converted.append((slide_num - 1, instruction))  # 0-based for API
 
     try:
@@ -556,7 +622,7 @@ def revise_artifact(
         raise ServiceError(
             f"Failed to revise slide deck: {e}",
             user_message="Could not revise slide deck.",
-        )
+        ) from e
 
     if not result or not result.get("artifact_id"):
         raise ServiceError(

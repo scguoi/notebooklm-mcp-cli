@@ -1,16 +1,17 @@
 """Server tools - Server info and version checking."""
 
-import urllib.request
 import json
+import urllib.request
 from typing import Any
 
 from notebooklm_tools import __version__
+
 from ._utils import logged_tool
 
 
 def _get_latest_pypi_version() -> str | None:
     """Fetch the latest version from PyPI.
-    
+
     Returns:
         Latest version string or None if fetch fails.
     """
@@ -26,7 +27,7 @@ def _get_latest_pypi_version() -> str | None:
 
 def _compare_versions(current: str, latest: str) -> bool:
     """Compare version strings to determine if an update is available.
-    
+
     Returns:
         True if latest is greater than current.
     """
@@ -42,10 +43,10 @@ def _compare_versions(current: str, latest: str) -> bool:
 @logged_tool()
 def server_info() -> dict[str, Any]:
     """Get server version and check for updates.
-    
+
     AI assistants: If update_available is True, inform the user that a new
     version is available and suggest updating with the provided command.
-    
+
     Returns:
         dict with version info:
         - version: Current installed version
@@ -55,10 +56,10 @@ def server_info() -> dict[str, Any]:
     """
     latest = _get_latest_pypi_version()
     update_available = False
-    
+
     if latest:
         update_available = _compare_versions(__version__, latest)
-    
+
     return {
         "status": "success",
         "version": __version__,

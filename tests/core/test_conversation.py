@@ -2,9 +2,9 @@
 """Tests for ConversationMixin."""
 
 import json
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from notebooklm_tools.core.base import BaseClient
 from notebooklm_tools.core.conversation import ConversationMixin, QueryRejectedError
@@ -94,7 +94,8 @@ class TestGetConversationId:
         with patch.object(mixin, "_call_rpc", return_value=None) as mock_rpc:
             mixin.get_conversation_id("nb-123")
         mock_rpc.assert_called_once_with(
-            mixin.RPC_GET_CONVERSATIONS, [[], None, "nb-123", 20],
+            mixin.RPC_GET_CONVERSATIONS,
+            [[], None, "nb-123", 20],
             path="/notebook/nb-123",
         )
 
@@ -135,7 +136,8 @@ class TestDeleteChatHistory:
         with patch.object(mixin, "_call_rpc", return_value=[]) as mock_rpc:
             mixin.delete_chat_history("nb-123", "conv-456")
         mock_rpc.assert_called_once_with(
-            mixin.RPC_DELETE_CHAT_HISTORY, ["nb-123", "conv-456"],
+            mixin.RPC_DELETE_CHAT_HISTORY,
+            ["nb-123", "conv-456"],
             path="/notebook/nb-123",
         )
 
@@ -149,11 +151,19 @@ class TestQueryUsesServerConversationId:
     def test_uses_server_conversation_id(self):
         """When server has a conversation ID, query() uses it instead of uuid."""
         mixin = self._make_mixin()
-        with patch.object(mixin, "get_conversation_id", return_value="server-conv-id"), \
-             patch.object(mixin, "_get_client") as mock_client:
+        with (
+            patch.object(mixin, "get_conversation_id", return_value="server-conv-id"),
+            patch.object(mixin, "_get_client") as mock_client,
+        ):
             mock_response = mock_client.return_value.post.return_value
             mock_response.text = ")]}'\n100\n" + json.dumps(
-                [["wrb.fr", None, json.dumps([["A long answer from the server.", None, [], None, [1]]])]]
+                [
+                    [
+                        "wrb.fr",
+                        None,
+                        json.dumps([["A long answer from the server.", None, [], None, [1]]]),
+                    ]
+                ]
             )
             mock_response.raise_for_status = lambda: None
 
@@ -164,11 +174,19 @@ class TestQueryUsesServerConversationId:
     def test_falls_back_to_uuid_when_no_server_id(self):
         """When server returns None, query() generates a random UUID."""
         mixin = self._make_mixin()
-        with patch.object(mixin, "get_conversation_id", return_value=None), \
-             patch.object(mixin, "_get_client") as mock_client:
+        with (
+            patch.object(mixin, "get_conversation_id", return_value=None),
+            patch.object(mixin, "_get_client") as mock_client,
+        ):
             mock_response = mock_client.return_value.post.return_value
             mock_response.text = ")]}'\n100\n" + json.dumps(
-                [["wrb.fr", None, json.dumps([["A long answer from the server.", None, [], None, [1]]])]]
+                [
+                    [
+                        "wrb.fr",
+                        None,
+                        json.dumps([["A long answer from the server.", None, [], None, [1]]]),
+                    ]
+                ]
             )
             mock_response.raise_for_status = lambda: None
 
@@ -185,47 +203,47 @@ class TestConversationMixinMethods:
     def test_clear_conversation_removes_from_cache(self):
         """Test that clear_conversation removes conversation from cache."""
         mixin = ConversationMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         # Add a conversation to cache
         mixin._conversation_cache["test-conv-id"] = []
-        
+
         # Clear it
         result = mixin.clear_conversation("test-conv-id")
-        
+
         assert result is True
         assert "test-conv-id" not in mixin._conversation_cache
 
     def test_clear_conversation_returns_false_if_not_found(self):
         """Test that clear_conversation returns False if conversation not in cache."""
         mixin = ConversationMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         result = mixin.clear_conversation("nonexistent-id")
-        
+
         assert result is False
 
     def test_get_conversation_history_returns_none_if_not_found(self):
         """Test that get_conversation_history returns None if conversation not in cache."""
         mixin = ConversationMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         result = mixin.get_conversation_history("nonexistent-id")
-        
+
         assert result is None
 
     def test_parse_query_response_handles_empty(self):
         """Test that _parse_query_response handles empty input."""
         mixin = ConversationMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         answer, citation_data, _ = mixin._parse_query_response("")
-        
+
         assert answer == ""
         assert citation_data == {}
 
     def test_extract_answer_from_chunk_handles_invalid_json(self):
         """Test that _extract_answer_from_chunk handles invalid JSON."""
         mixin = ConversationMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         text, is_answer, cdata, _ = mixin._extract_answer_from_chunk("not valid json")
-        
+
         assert text is None
         assert is_answer is False
         assert cdata == {}
@@ -233,17 +251,17 @@ class TestConversationMixinMethods:
     def test_extract_source_ids_from_notebook_handles_none(self):
         """Test that _extract_source_ids_from_notebook handles None input."""
         mixin = ConversationMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         result = mixin._extract_source_ids_from_notebook(None)
-        
+
         assert result == []
 
     def test_extract_source_ids_from_notebook_handles_empty_list(self):
         """Test that _extract_source_ids_from_notebook handles empty list."""
         mixin = ConversationMixin(cookies={"test": "cookie"}, csrf_token="test")
-        
+
         result = mixin._extract_source_ids_from_notebook([])
-        
+
         assert result == []
 
 
@@ -267,10 +285,9 @@ class TestErrorDetection:
         """Error code 8 with UserDisplayableError type."""
         mixin = self._make_mixin()
         error_type = "type.googleapis.com/google.internal.labs.tailwind.orchestration.v1.UserDisplayableError"
-        chunk = json.dumps([
-            ["wrb.fr", None, None, None, None,
-             [8, None, [[error_type, [None, [None, [[1]]]]]]]]
-        ])
+        chunk = json.dumps(
+            [["wrb.fr", None, None, None, None, [8, None, [[error_type, [None, [None, [[1]]]]]]]]]
+        )
         result = mixin._extract_error_from_chunk(chunk)
 
         assert result is not None
@@ -280,7 +297,17 @@ class TestErrorDetection:
     def test_extract_error_returns_none_for_normal_chunk(self):
         """Normal wrb.fr chunk with answer data should not be detected as error."""
         mixin = self._make_mixin()
-        inner = json.dumps([["This is a long enough answer text for the test to pass properly.", None, [], None, [1]]])
+        inner = json.dumps(
+            [
+                [
+                    "This is a long enough answer text for the test to pass properly.",
+                    None,
+                    [],
+                    None,
+                    [1],
+                ]
+            ]
+        )
         chunk = json.dumps([["wrb.fr", None, inner, None, None, None]])
         result = mixin._extract_error_from_chunk(chunk)
 
@@ -298,7 +325,7 @@ class TestErrorDetection:
     @staticmethod
     def _build_raw_response(*chunks: str) -> str:
         """Build a raw Google API response with anti-XSSI prefix."""
-        prefix = ")]}\'\n"
+        prefix = ")]}'\n"
         parts = [prefix]
         for chunk in chunks:
             parts.append(str(len(chunk)))
@@ -322,10 +349,9 @@ class TestErrorDetection:
         """Full response with UserDisplayableError raises QueryRejectedError."""
         mixin = self._make_mixin()
         error_type = "type.googleapis.com/google.internal.labs.tailwind.orchestration.v1.UserDisplayableError"
-        error_chunk = json.dumps([
-            ["wrb.fr", None, None, None, None,
-             [8, None, [[error_type, [None, [None, [[1]]]]]]]]
-        ])
+        error_chunk = json.dumps(
+            [["wrb.fr", None, None, None, None, [8, None, [[error_type, [None, [None, [[1]]]]]]]]]
+        )
         raw = self._build_raw_response(error_chunk)
 
         with pytest.raises(QueryRejectedError) as exc_info:
@@ -410,7 +436,7 @@ class TestCitationExtraction:
 
     @staticmethod
     def _build_raw_response(*chunks: str) -> str:
-        prefix = ")]}\'\n"
+        prefix = ")]}'\n"
         parts = [prefix]
         for chunk in chunks:
             parts.append(str(len(chunk)))
@@ -444,7 +470,9 @@ class TestCitationExtraction:
             self._build_passage("p2", "source-A"),
             self._build_passage("p3", "source-B"),
         ]
-        inner = self._build_answer_inner("A long enough answer text to pass the length check.", passages)
+        inner = self._build_answer_inner(
+            "A long enough answer text to pass the length check.", passages
+        )
         chunk = json.dumps([["wrb.fr", None, inner]])
 
         _, _, cdata, _ = mixin._extract_answer_from_chunk(chunk)
@@ -454,7 +482,9 @@ class TestCitationExtraction:
     def test_extract_citations_no_passages(self):
         """Answer chunk without source passages returns empty citation data."""
         mixin = self._make_mixin()
-        inner = self._build_answer_inner("A long enough answer text to pass the length check.", passages=None)
+        inner = self._build_answer_inner(
+            "A long enough answer text to pass the length check.", passages=None
+        )
         chunk = json.dumps([["wrb.fr", None, inner]])
 
         text, is_answer, cdata, _ = mixin._extract_answer_from_chunk(chunk)
@@ -466,7 +496,9 @@ class TestCitationExtraction:
     def test_extract_citations_empty_passages_list(self):
         """Answer chunk with empty passages list returns empty citation data."""
         mixin = self._make_mixin()
-        inner = self._build_answer_inner("A long enough answer text to pass the length check.", passages=[])
+        inner = self._build_answer_inner(
+            "A long enough answer text to pass the length check.", passages=[]
+        )
         chunk = json.dumps([["wrb.fr", None, inner]])
 
         _, _, cdata, _ = mixin._extract_answer_from_chunk(chunk)
@@ -482,7 +514,9 @@ class TestCitationExtraction:
             "not even a list",
             self._build_passage("p3", "source-B"),
         ]
-        inner = self._build_answer_inner("A long enough answer text to pass the length check.", passages)
+        inner = self._build_answer_inner(
+            "A long enough answer text to pass the length check.", passages
+        )
         chunk = json.dumps([["wrb.fr", None, inner]])
 
         _, _, cdata, _ = mixin._extract_answer_from_chunk(chunk)
@@ -512,7 +546,9 @@ class TestCitationExtraction:
             self._build_passage("p2", "src-Y"),
         ]
         short_answer = "Short answer text that is long enough."
-        long_answer = "This is the longer answer text with citations [1] and [2] referencing sources."
+        long_answer = (
+            "This is the longer answer text with citations [1] and [2] referencing sources."
+        )
         short_inner = self._build_answer_inner(short_answer, [self._build_passage("p0", "src-Z")])
         long_inner = self._build_answer_inner(long_answer, passages)
         short_chunk = json.dumps([["wrb.fr", None, short_inner]])
@@ -528,7 +564,9 @@ class TestCitationExtraction:
     def test_parse_response_no_citations_returns_empty_dict(self):
         """Response with answer but no citation data returns empty dict."""
         mixin = self._make_mixin()
-        inner = json.dumps([["A long enough answer text to pass the length check.", None, [], None, [1]]])
+        inner = json.dumps(
+            [["A long enough answer text to pass the length check.", None, [], None, [1]]]
+        )
         chunk = json.dumps([["wrb.fr", None, inner]])
         raw = self._build_raw_response(chunk)
 
@@ -554,7 +592,10 @@ class TestCitedTextParsing:
     def test_wrapped_segments_extract_text(self):
         """Wrapped segments [[seg], ...] extract text correctly (original format)."""
         detail = [
-            None, None, 0.75, None,
+            None,
+            None,
+            0.75,
+            None,
             [
                 [[0, 50, [[[0, 50, ["Hello world."]]]]]],
             ],
@@ -565,10 +606,11 @@ class TestCitedTextParsing:
     def test_direct_segments_extract_text(self):
         """Direct segments [int, int, nested] extract text correctly (PR #84 fix)."""
         detail = [
-            None, None, 0.75, None,
-            [
-                [0, 100, [[[0, 100, ["Direct segment text."]]]]]
-            ],
+            None,
+            None,
+            0.75,
+            None,
+            [[0, 100, [[[0, 100, ["Direct segment text."]]]]]],
         ]
         result = ConversationMixin._extract_cited_text(detail)
         assert result == "Direct segment text."
@@ -576,7 +618,10 @@ class TestCitedTextParsing:
     def test_mixed_direct_and_wrapped_segments(self):
         """Both direct and wrapped segments are extracted together."""
         detail = [
-            None, None, 0.75, None,
+            None,
+            None,
+            0.75,
+            None,
             [
                 # Wrapped segment
                 [[0, 30, [[[0, 30, ["Wrapped text."]]]]]],
@@ -595,7 +640,10 @@ class TestCitedTextParsing:
         cell_b = [11, 20, [[0, 1, [[[[0, 1, ["B"]], None]]]]]]
         table_rows = [[0, 50, [cell_a, cell_b]]]
         detail = [
-            None, None, 0.75, None,
+            None,
+            None,
+            0.75,
+            None,
             [
                 [0, 100, None, None, [2, 1, table_rows]],
             ],
@@ -609,7 +657,10 @@ class TestCitedTextParsing:
         cell_y = [11, 20, [[0, 1, [[[[0, 1, ["Y"]], None]]]]]]
         table_rows = [[0, 50, [cell_x, cell_y]]]
         detail = [
-            None, None, 0.75, None,
+            None,
+            None,
+            0.75,
+            None,
             [
                 [0, 30, [[[0, 30, ["Some intro text."]]]]],
                 [31, 100, None, None, [2, 1, table_rows]],
@@ -624,9 +675,7 @@ class TestCitedTextParsing:
 
     def test_detail_index_4_not_list_returns_none(self):
         """detail[4] being non-list returns None."""
-        assert ConversationMixin._extract_cited_text(
-            [None, None, 0.75, None, "not a list"]
-        ) is None
+        assert ConversationMixin._extract_cited_text([None, None, 0.75, None, "not a list"]) is None
 
     def test_empty_elements_returns_none(self):
         """Empty elements in detail[4] are skipped, returns None."""
@@ -644,11 +693,7 @@ class TestTableRowParsing:
         Structure: [start, end, [[sub_start, sub_end, [content_item]]]]
         content_item: [[text_start, text_end, text_val]]
         """
-        return [0, 10, [
-            [0, len(text), [
-                [[0, len(text), text]]
-            ]]
-        ]]
+        return [0, 10, [[0, len(text), [[[0, len(text), text]]]]]]
 
     @staticmethod
     def _make_row(start: int, end: int, cells: list) -> list:
@@ -675,10 +720,14 @@ class TestTableRowParsing:
     def test_empty_cells(self):
         """Empty cells (short lists) produce empty strings."""
         rows = [
-            self._make_row(0, 50, [
-                [0, 25],  # empty cell (no third element)
-                self._make_cell("Data"),
-            ]),
+            self._make_row(
+                0,
+                50,
+                [
+                    [0, 25],  # empty cell (no third element)
+                    self._make_cell("Data"),
+                ],
+            ),
         ]
         result = ConversationMixin._extract_text_from_table_rows(rows)
         assert len(result) == 1
@@ -695,11 +744,7 @@ class TestTableFromDetail:
         Structure: [start, end, [[sub_start, sub_end, [content_item]]]]
         content_item: [[text_start, text_end, text_val]]
         """
-        return [0, 10, [
-            [0, len(text), [
-                [[0, len(text), text]]
-            ]]
-        ]]
+        return [0, 10, [[0, len(text), [[[0, len(text), text]]]]]]
 
     def test_extracts_table_from_detail(self):
         """Table segment in detail[4] is extracted with num_columns and rows."""
@@ -707,7 +752,10 @@ class TestTableFromDetail:
             [0, 50, [self._make_cell("Col1"), self._make_cell("Col2")]],
         ]
         detail = [
-            None, None, 0.75, None,
+            None,
+            None,
+            0.75,
+            None,
             [
                 [0, 100, None, None, [2, 1, table_rows]],
             ],
@@ -721,7 +769,10 @@ class TestTableFromDetail:
     def test_returns_none_for_text_only_detail(self):
         """detail with only text segments (no tables) returns None."""
         detail = [
-            None, None, 0.75, None,
+            None,
+            None,
+            0.75,
+            None,
             [
                 [[0, 50, [[[0, 50, ["Just text."]]]]]],
             ],
@@ -736,9 +787,10 @@ class TestTableFromDetail:
 
     def test_returns_none_for_non_list_index_4(self):
         """detail[4] being non-list returns None."""
-        assert ConversationMixin._extract_table_from_detail(
-            [None, None, 0.75, None, "not_a_list"]
-        ) is None
+        assert (
+            ConversationMixin._extract_table_from_detail([None, None, 0.75, None, "not_a_list"])
+            is None
+        )
 
 
 class TestCitationDataWithTable:
@@ -751,11 +803,7 @@ class TestCitationDataWithTable:
         Structure: [start, end, [[sub_start, sub_end, [content_item]]]]
         content_item: [[text_start, text_end, text_val]]
         """
-        return [0, 10, [
-            [0, len(text), [
-                [[0, len(text), text]]
-            ]]
-        ]]
+        return [0, 10, [[0, len(text), [[[0, len(text), text]]]]]]
 
     @classmethod
     def _build_passage_with_table(
@@ -771,7 +819,9 @@ class TestCitationDataWithTable:
         return [
             [passage_id],
             [
-                None, None, 0.75,
+                None,
+                None,
+                0.75,
                 [[None, 0, 500]],
                 [
                     [0, 200, None, None, [len(cell_texts[0]), len(cell_texts), table_rows]],
@@ -804,7 +854,9 @@ class TestCitationDataWithTable:
             [
                 ["pass-1"],
                 [
-                    None, None, 0.75,
+                    None,
+                    None,
+                    0.75,
                     [[None, 0, 500]],
                     [[[0, 500, [[[0, 500, ["Normal text."]]]]]]],
                     [[["src-1"], "hash"]],
@@ -820,4 +872,3 @@ class TestCitationDataWithTable:
         ref = result["references"][0]
         assert "cited_table" not in ref
         assert ref.get("cited_text") == "Normal text."
-

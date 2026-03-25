@@ -2,8 +2,9 @@
 
 from typing import Any
 
+from ...services import ServiceError
+from ...services import sources as sources_service
 from ._utils import get_client, logged_tool
-from ...services import sources as sources_service, ServiceError
 
 
 @logged_tool()
@@ -53,18 +54,27 @@ def source_add(
         # Bulk URL add: when urls list is provided
         if urls and source_type == "url":
             result = sources_service.add_sources(
-                client, notebook_id,
+                client,
+                notebook_id,
                 [{"source_type": "url", "url": u} for u in urls],
-                wait=wait, wait_timeout=wait_timeout,
+                wait=wait,
+                wait_timeout=wait_timeout,
             )
             return {"status": "success", "ready": wait, **result}
 
         # Single source add (existing behavior)
         result = sources_service.add_source(
-            client, notebook_id, source_type,
-            url=url, text=text, title=title,
-            file_path=file_path, document_id=document_id,
-            doc_type=doc_type, wait=wait, wait_timeout=wait_timeout,
+            client,
+            notebook_id,
+            source_type,
+            url=url,
+            text=text,
+            title=title,
+            file_path=file_path,
+            document_id=document_id,
+            doc_type=doc_type,
+            wait=wait,
+            wait_timeout=wait_timeout,
         )
         return {"status": "success", "ready": wait, **result}
     except ServiceError as e:

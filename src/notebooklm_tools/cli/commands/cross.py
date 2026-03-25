@@ -1,6 +1,5 @@
 """Cross-notebook CLI commands — query across multiple notebooks."""
 
-
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -19,20 +18,26 @@ app = typer.Typer(
 def cross_query(
     query: str = typer.Argument(..., help="Question to ask across notebooks"),
     notebooks: str | None = typer.Option(
-        None, "--notebooks", "-n",
+        None,
+        "--notebooks",
+        "-n",
         help="Comma-separated notebook names or IDs",
     ),
     tags: str | None = typer.Option(
-        None, "--tags", "-t",
+        None,
+        "--tags",
+        "-t",
         help="Comma-separated tags to select notebooks",
     ),
     all_notebooks: bool = typer.Option(
-        False, "--all", "-a",
+        False,
+        "--all",
+        "-a",
         help="Query ALL notebooks (rate limits apply)",
     ),
 ) -> None:
     """Query multiple notebooks and get aggregated answers."""
-    from notebooklm_tools.cli.utils import get_client, handle_error
+    from notebooklm_tools.cli.utils import get_client
     from notebooklm_tools.services import cross_notebook as cross_notebook_service
 
     try:
@@ -64,11 +69,13 @@ def cross_query(
         for r in result["results"]:
             title = r.get("notebook_title") or r["notebook_id"][:12]
             if r["error"]:
-                console.print(Panel(
-                    f"[red]Error:[/red] {r['error']}",
-                    title=f"[red]{title}[/red]",
-                    border_style="red",
-                ))
+                console.print(
+                    Panel(
+                        f"[red]Error:[/red] {r['error']}",
+                        title=f"[red]{title}[/red]",
+                        border_style="red",
+                    )
+                )
             else:
                 sources = ""
                 if r["sources_used"]:
@@ -79,15 +86,17 @@ def cross_query(
                         else:
                             source_names.append(str(s))
                     sources = f"\n\n[dim]Sources: {', '.join(source_names)}[/dim]"
-                console.print(Panel(
-                    f"{r['answer']}{sources}",
-                    title=f"[cyan]{title}[/cyan]",
-                    border_style="cyan",
-                ))
+                console.print(
+                    Panel(
+                        f"{r['answer']}{sources}",
+                        title=f"[cyan]{title}[/cyan]",
+                        border_style="cyan",
+                    )
+                )
 
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e

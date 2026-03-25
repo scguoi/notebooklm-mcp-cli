@@ -1,14 +1,16 @@
 """Export service — shared business logic for Google Docs/Sheets exports."""
 
-from typing import TypedDict, Literal, Optional, cast
+from typing import Literal, TypedDict, cast
 
 from ..core.client import NotebookLMClient
-from .errors import ValidationError, ExportError
+from .errors import ExportError, ValidationError
 
 ExportType = Literal["docs", "sheets"]
 
+
 class ExportResult(TypedDict):
     """Result of an export operation."""
+
     status: Literal["success", "error"]
     notebook_id: str
     artifact_id: str
@@ -16,12 +18,13 @@ class ExportResult(TypedDict):
     url: str
     message: str
 
+
 def export_artifact(
     client: NotebookLMClient,
     notebook_id: str,
     artifact_id: str,
     export_type: str,
-    title: Optional[str] = None,
+    title: str | None = None,
 ) -> ExportResult:
     """Export a NotebookLM artifact to Google Docs or Sheets.
 
@@ -44,7 +47,7 @@ def export_artifact(
     if clean_type not in ("docs", "sheets"):
         raise ValidationError(
             f"Invalid export type '{export_type}'. Must be 'docs' or 'sheets'.",
-            user_message=f"Export type must be 'docs' or 'sheets' (got '{export_type}')"
+            user_message=f"Export type must be 'docs' or 'sheets' (got '{export_type}')",
         )
 
     # 2. Execution
@@ -56,7 +59,7 @@ def export_artifact(
             export_type=clean_type,
         )
     except Exception as e:
-        raise ExportError(f"API call failed: {e}", user_message=f"Export failed: {e}")
+        raise ExportError(f"API call failed: {e}", user_message=f"Export failed: {e}") from e
 
     # 3. Result Normalization
     if result.get("url"):
@@ -71,8 +74,12 @@ def export_artifact(
         }
     else:
         # Fail-fast: summarize response keys to avoid leaking huge payloads in the error
-        response_summary = f"keys={list(result.keys())}" if isinstance(result, dict) else repr(result)[:200]
+        response_summary = (
+            f"keys={list(result.keys())}" if isinstance(result, dict) else repr(result)[:200]
+        )
         raise ExportError(
             f"Export failed - no document URL returned. Response summary: {response_summary}",
-            user_message=result.get("message", "Export failed - no document URL returned") if isinstance(result, dict) else "Export failed - no document URL returned",
+            user_message=result.get("message", "Export failed - no document URL returned")
+            if isinstance(result, dict)
+            else "Export failed - no document URL returned",
         )

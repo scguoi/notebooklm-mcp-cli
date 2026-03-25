@@ -12,6 +12,7 @@ TAGS_FILE = "tags.json"
 
 class TagEntry(TypedDict):
     """Tag entry for a notebook."""
+
     notebook_id: str
     notebook_title: str
     tags: list[str]
@@ -19,12 +20,14 @@ class TagEntry(TypedDict):
 
 class TagListResult(TypedDict):
     """Result of listing all tags."""
+
     entries: list[TagEntry]
     count: int
 
 
 class SmartSelectResult(TypedDict):
     """Result of smart notebook selection."""
+
     query: str
     matched_notebooks: list[TagEntry]
     count: int
@@ -86,11 +89,14 @@ def tag_add(
         )
 
     all_tags = _load_tags()
-    existing = all_tags.get(notebook_id, {
-        "notebook_id": notebook_id,
-        "notebook_title": notebook_title,
-        "tags": [],
-    })
+    existing = all_tags.get(
+        notebook_id,
+        {
+            "notebook_id": notebook_id,
+            "notebook_title": notebook_title,
+            "tags": [],
+        },
+    )
 
     if notebook_title:
         existing["notebook_title"] = notebook_title
@@ -136,7 +142,11 @@ def tag_remove(
     if not entry["tags"]:
         del all_tags[notebook_id]
         _save_tags(all_tags)
-        return {"notebook_id": notebook_id, "notebook_title": entry.get("notebook_title", ""), "tags": []}
+        return {
+            "notebook_id": notebook_id,
+            "notebook_title": entry.get("notebook_title", ""),
+            "tags": [],
+        }
 
     all_tags[notebook_id] = entry
     _save_tags(all_tags)

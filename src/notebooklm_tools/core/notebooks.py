@@ -13,8 +13,8 @@ This mixin provides all notebook-related operations:
 import logging
 from typing import Any
 
-from .base import BaseClient
 from . import constants
+from .base import BaseClient
 from .data_types import Notebook
 from .utils import parse_timestamp
 
@@ -28,7 +28,7 @@ OWNERSHIP_SHARED = constants.OWNERSHIP_SHARED
 
 class NotebookMixin(BaseClient):
     """Mixin for notebook management operations.
-    
+
     This class inherits from BaseClient and provides all notebook-related
     operations. It is designed to be composed with other mixins via
     multiple inheritance in the final NotebookLMClient class.
@@ -98,24 +98,30 @@ class NotebookMixin(BaseClient):
                                 src_title = src[1] if len(src) > 1 else "Untitled"
 
                                 # Extract the source ID (might be in a list)
-                                src_id = src_ids[0] if isinstance(src_ids, list) and src_ids else src_ids
+                                src_id = (
+                                    src_ids[0] if isinstance(src_ids, list) and src_ids else src_ids
+                                )
 
-                                sources.append({
-                                    "id": src_id,
-                                    "title": src_title,
-                                })
+                                sources.append(
+                                    {
+                                        "id": src_id,
+                                        "title": src_title,
+                                    }
+                                )
 
                     if notebook_id:
-                        notebooks.append(Notebook(
-                            id=notebook_id,
-                            title=title,
-                            source_count=len(sources),
-                            sources=sources,
-                            is_owned=is_owned,
-                            is_shared=is_shared,
-                            created_at=created_at,
-                            modified_at=modified_at,
-                        ))
+                        notebooks.append(
+                            Notebook(
+                                id=notebook_id,
+                                title=title,
+                                source_count=len(sources),
+                                sources=sources,
+                                is_owned=is_owned,
+                                is_shared=is_shared,
+                                created_at=created_at,
+                                modified_at=modified_at,
+                            )
+                        )
 
         return notebooks
 
@@ -142,13 +148,17 @@ class NotebookMixin(BaseClient):
 
             # Suggested topics are at result[1][0]
             if len(result) > 1 and result[1]:
-                topics_data = result[1][0] if isinstance(result[1], list) and len(result[1]) > 0 else []
+                topics_data = (
+                    result[1][0] if isinstance(result[1], list) and len(result[1]) > 0 else []
+                )
                 for topic in topics_data:
                     if isinstance(topic, list) and len(topic) >= 2:
-                        suggested_topics.append({
-                            "question": topic[0],
-                            "prompt": topic[1],
-                        })
+                        suggested_topics.append(
+                            {
+                                "question": topic[0],
+                                "prompt": topic[1],
+                            }
+                        )
 
         return {
             "summary": summary,
@@ -157,7 +167,13 @@ class NotebookMixin(BaseClient):
 
     def create_notebook(self, title: str = "") -> Notebook | None:
         """Create a new notebook."""
-        params = [title, None, None, [2], [1, None, None, None, None, None, None, None, None, None, [1]]]
+        params = [
+            title,
+            None,
+            None,
+            [2],
+            [1, None, None, None, None, None, None, None, None, None, [1]],
+        ]
         result = self._call_rpc(self.RPC_CREATE_NOTEBOOK, params)
         if result and isinstance(result, list) and len(result) >= 3:
             notebook_id = result[2]

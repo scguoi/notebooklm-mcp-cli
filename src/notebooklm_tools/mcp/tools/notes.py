@@ -1,8 +1,10 @@
 """Notes tools - Note management with consolidated note tool."""
 
 from typing import Any
+
+from ...services import ServiceError, ValidationError
+from ...services import notes as notes_service
 from ._utils import get_client, logged_tool
-from ...services import notes as notes_service, ServiceError, ValidationError
 
 
 @logged_tool()

@@ -18,14 +18,16 @@ class ConversationTurn:
     Used to track conversation history for follow-up queries.
     NotebookLM requires the full conversation history in follow-up requests.
     """
-    query: str       # The user's question
-    answer: str      # The AI's response
+
+    query: str  # The user's question
+    answer: str  # The AI's response
     turn_number: int  # 1-indexed turn number in the conversation
 
 
 @dataclass
 class Collaborator:
     """A user with access to a notebook."""
+
     email: str
     role: str  # "owner", "editor", "viewer"
     is_pending: bool = False
@@ -35,6 +37,7 @@ class Collaborator:
 @dataclass
 class ShareStatus:
     """Current sharing state of a notebook."""
+
     is_public: bool
     access_level: str  # "restricted" or "public"
     collaborators: list[Collaborator]
@@ -48,13 +51,14 @@ class Notebook:
     This is the primary notebook data structure used throughout the API client.
     Contains notebook metadata, source information, and computed properties.
     """
+
     id: str
     title: str
     source_count: int
     sources: list[dict]
-    is_owned: bool = True     # True if owned by user, False if shared with user
-    is_shared: bool = False   # True if shared with others (for owned notebooks)
-    created_at: str | None = None   # ISO format timestamp
+    is_owned: bool = True  # True if owned by user, False if shared with user
+    is_shared: bool = False  # True if shared with others (for owned notebooks)
+    created_at: str | None = None  # ISO format timestamp
     modified_at: str | None = None  # ISO format timestamp
 
     @property

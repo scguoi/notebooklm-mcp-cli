@@ -1,16 +1,17 @@
 """Tests for services.sharing module."""
 
-import pytest
-from unittest.mock import MagicMock
 from dataclasses import dataclass
+from unittest.mock import MagicMock
 
+import pytest
+
+from notebooklm_tools.services.errors import ServiceError, ValidationError
 from notebooklm_tools.services.sharing import (
     get_share_status,
-    set_public_access,
     invite_collaborator,
     invite_collaborators_bulk,
+    set_public_access,
 )
-from notebooklm_tools.services.errors import ValidationError, ServiceError
 
 
 @dataclass

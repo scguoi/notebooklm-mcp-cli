@@ -1,12 +1,13 @@
 """Tests for file upload functionality."""
+
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-import pytest
 import httpx
+import pytest
 
-from notebooklm_tools.core.exceptions import FileValidationError, FileUploadError
+from notebooklm_tools.core.exceptions import FileUploadError, FileValidationError
 
 
 class TestFileValidation:
@@ -55,7 +56,7 @@ class TestFileValidation:
         client._session_id = "test"
         client._client = None
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:  # noqa: SIM117
             with pytest.raises(FileValidationError, match="Not a regular file"):
                 client.add_file("test-notebook-id", tmpdir)
 
@@ -96,14 +97,14 @@ class TestFileUploadProtocol:
 
         # Mock the HTTP client and response
         mock_response = Mock()
-        mock_response.text = ")]}'\n100\n[[\"wrb.fr\",\"o4cbdc\",\"[[[[\\\"source-id-123\\\"]]]]\",null,null,null,\"generic\"]]"
+        mock_response.text = ')]}\'\n100\n[["wrb.fr","o4cbdc","[[[[\\"source-id-123\\"]]]]",null,null,null,"generic"]]'
         mock_response.status_code = 200
         mock_response.raise_for_status = Mock()
 
         mock_http_client = Mock()
         mock_http_client.post = Mock(return_value=mock_response)
 
-        with patch.object(client, '_get_client', return_value=mock_http_client):
+        with patch.object(client, "_get_client", return_value=mock_http_client):
             source_id = client._register_file_source("notebook-123", "test.pdf")
 
         assert source_id == "source-id-123"
@@ -121,14 +122,14 @@ class TestFileUploadProtocol:
 
         # Mock response with no source ID
         mock_response = Mock()
-        mock_response.text = ")]}'\n100\n[[\"wrb.fr\",\"o4cbdc\",\"null\",null,null,null,\"generic\"]]"
+        mock_response.text = ')]}\'\n100\n[["wrb.fr","o4cbdc","null",null,null,null,"generic"]]'
         mock_response.status_code = 200
         mock_response.raise_for_status = Mock()
 
         mock_http_client = Mock()
         mock_http_client.post = Mock(return_value=mock_response)
 
-        with patch.object(client, '_get_client', return_value=mock_http_client):
+        with patch.object(client, "_get_client", return_value=mock_http_client):  # noqa: SIM117
             with pytest.raises(FileUploadError, match="Failed to get SOURCE_ID"):
                 client._register_file_source("notebook-123", "test.pdf")
 
@@ -149,14 +150,14 @@ class TestFileUploadProtocol:
         mock_response.status_code = 200
         mock_response.raise_for_status = Mock()
 
-        with patch('httpx.Client') as mock_client_class:
+        with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__enter__ = Mock(return_value=mock_client)
             mock_client.__exit__ = Mock(return_value=False)
             mock_client.post = Mock(return_value=mock_response)
             mock_client_class.return_value = mock_client
 
-            with patch.object(client, '_get_httpx_cookies', return_value=httpx.Cookies()):
+            with patch.object(client, "_get_httpx_cookies", return_value=httpx.Cookies()):
                 upload_url = client._start_resumable_upload(
                     "notebook-123", "test.pdf", 1024, "source-id-123"
                 )
@@ -180,14 +181,14 @@ class TestFileUploadProtocol:
         mock_response.status_code = 200
         mock_response.raise_for_status = Mock()
 
-        with patch('httpx.Client') as mock_client_class:
+        with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__enter__ = Mock(return_value=mock_client)
             mock_client.__exit__ = Mock(return_value=False)
             mock_client.post = Mock(return_value=mock_response)
             mock_client_class.return_value = mock_client
 
-            with patch.object(client, '_get_httpx_cookies', return_value=httpx.Cookies()):
+            with patch.object(client, "_get_httpx_cookies", return_value=httpx.Cookies()):  # noqa: SIM117
                 with pytest.raises(FileUploadError, match="Failed to get upload URL"):
                     client._start_resumable_upload(
                         "notebook-123", "test.pdf", 1024, "source-id-123"
@@ -214,14 +215,14 @@ class TestFileUploadProtocol:
             mock_response.status_code = 200
             mock_response.raise_for_status = Mock()
 
-            with patch('httpx.Client') as mock_client_class:
+            with patch("httpx.Client") as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.__enter__ = Mock(return_value=mock_client)
                 mock_client.__exit__ = Mock(return_value=False)
                 mock_client.post = Mock(return_value=mock_response)
                 mock_client_class.return_value = mock_client
 
-                with patch.object(client, '_get_httpx_cookies', return_value=httpx.Cookies()):
+                with patch.object(client, "_get_httpx_cookies", return_value=httpx.Cookies()):
                     client._upload_file_streaming("https://upload.url/session123", temp_path)
 
             # Verify post was called
@@ -250,10 +251,15 @@ class TestAddFileIntegration:
 
         try:
             # Mock all three steps
-            with patch.object(client, '_register_file_source', return_value="source-id-123") as mock_register, \
-                 patch.object(client, '_start_resumable_upload', return_value="https://upload.url/session") as mock_start, \
-                 patch.object(client, '_upload_file_streaming') as mock_upload:
-
+            with (
+                patch.object(
+                    client, "_register_file_source", return_value="source-id-123"
+                ) as mock_register,
+                patch.object(
+                    client, "_start_resumable_upload", return_value="https://upload.url/session"
+                ) as mock_start,
+                patch.object(client, "_upload_file_streaming") as mock_upload,
+            ):
                 result = client.add_file("notebook-123", temp_path)
 
             # Verify all three steps were called
@@ -283,9 +289,7 @@ class TestFileUploadE2E:
             pytest.skip("No authentication tokens available")
 
         client = NotebookLMClient(
-            cookies=tokens.cookies,
-            csrf_token=tokens.csrf_token,
-            session_id=tokens.session_id
+            cookies=tokens.cookies, csrf_token=tokens.csrf_token, session_id=tokens.session_id
         )
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
@@ -312,16 +316,14 @@ def temp_notebook():
         pytest.skip("No authentication tokens available")
 
     client = NotebookLMClient(
-        cookies=tokens.cookies,
-        csrf_token=tokens.csrf_token,
-        session_id=tokens.session_id
+        cookies=tokens.cookies, csrf_token=tokens.csrf_token, session_id=tokens.session_id
     )
     notebook = client.create_notebook(title="Test Upload Notebook")
 
     yield notebook
 
     # Cleanup
-    try:
+    try:  # noqa: SIM105
         client.delete_notebook(notebook.id)
     except Exception:
         pass  # Ignore cleanup errors

@@ -22,7 +22,17 @@ def _get_studio_types() -> dict[str, Any]:
             "description": "Video Overview",
             "options": {
                 "video_format": ["explainer", "brief"],
-                "visual_style": ["auto_select", "classic", "whiteboard", "kawaii", "anime", "watercolor", "retro_print", "heritage", "paper_craft"],
+                "visual_style": [
+                    "auto_select",
+                    "classic",
+                    "whiteboard",
+                    "kawaii",
+                    "anime",
+                    "watercolor",
+                    "retro_print",
+                    "heritage",
+                    "paper_craft",
+                ],
                 "language": "BCP-47 code",
                 "focus_prompt": "Optional focus topic",
             },

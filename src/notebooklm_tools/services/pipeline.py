@@ -23,7 +23,10 @@ BUILTIN_PIPELINES = {
         "description": "Add a URL source, query for summary, then generate audio podcast",
         "steps": [
             {"action": "source_add", "params": {"type": "url", "url": "$INPUT_URL"}},
-            {"action": "notebook_query", "params": {"query": "Summarize the content that was just added"}},
+            {
+                "action": "notebook_query",
+                "params": {"query": "Summarize the content that was just added"},
+            },
             {"action": "studio_create", "params": {"artifact_type": "audio"}},
         ],
     },
@@ -32,7 +35,10 @@ BUILTIN_PIPELINES = {
         "description": "Add a URL source and generate a briefing doc report",
         "steps": [
             {"action": "source_add", "params": {"type": "url", "url": "$INPUT_URL"}},
-            {"action": "studio_create", "params": {"artifact_type": "report", "report_format": "Briefing Doc"}},
+            {
+                "action": "studio_create",
+                "params": {"artifact_type": "report", "report_format": "Briefing Doc"},
+            },
         ],
     },
     "multi-format": {
@@ -48,13 +54,17 @@ BUILTIN_PIPELINES = {
 
 # Valid pipeline actions mapped to service functions
 VALID_ACTIONS = {
-    "source_add", "notebook_query", "studio_create",
-    "notebook_create", "notebook_delete",
+    "source_add",
+    "notebook_query",
+    "studio_create",
+    "notebook_create",
+    "notebook_delete",
 }
 
 
 class StepResult(TypedDict):
     """Result of a single pipeline step."""
+
     step: int
     action: str
     success: bool
@@ -65,6 +75,7 @@ class StepResult(TypedDict):
 
 class PipelineResult(TypedDict):
     """Result of a complete pipeline execution."""
+
     pipeline_name: str
     notebook_id: str
     steps: list[StepResult]
@@ -76,6 +87,7 @@ class PipelineResult(TypedDict):
 
 class PipelineInfo(TypedDict):
     """Pipeline metadata."""
+
     name: str
     description: str
     steps_count: int
@@ -95,7 +107,7 @@ def _substitute_vars(params: dict, variables: dict[str, str]) -> dict:
     for key, value in params.items():
         if isinstance(value, str) and value.startswith("$"):
             var_name = value[1:]  # strip $
-            if var_name in variables:
+            if var_name in variables:  # noqa: SIM401
                 result[key] = variables[var_name]
             else:
                 result[key] = value  # keep as-is if not found
@@ -116,7 +128,8 @@ def _execute_step(
         url = params.get("url", "")
         text = params.get("text", "")
         return sources_service.add_source(
-            client, notebook_id,
+            client,
+            notebook_id,
             source_type=source_type,
             url=url if source_type == "url" else None,
             text=text if source_type == "text" else None,
@@ -129,7 +142,9 @@ def _execute_step(
     elif action == "studio_create":
         artifact_type = params.get("artifact_type", "audio")
         return studio_service.create_artifact(
-            client, notebook_id, artifact_type,
+            client,
+            notebook_id,
+            artifact_type,
             focus_prompt=params.get("focus_prompt", ""),
             audio_format=params.get("audio_format", "deep_dive"),
             audio_length=params.get("audio_length", "default"),
@@ -199,24 +214,28 @@ def pipeline_run(
         try:
             result = _execute_step(client, notebook_id, action, params)
             duration = int((time.monotonic() - step_start) * 1000)
-            step_results.append({
-                "step": i + 1,
-                "action": action,
-                "success": True,
-                "result": result,
-                "error": None,
-                "duration_ms": duration,
-            })
+            step_results.append(
+                {
+                    "step": i + 1,
+                    "action": action,
+                    "success": True,
+                    "result": result,
+                    "error": None,
+                    "duration_ms": duration,
+                }
+            )
         except Exception as e:
             duration = int((time.monotonic() - step_start) * 1000)
-            step_results.append({
-                "step": i + 1,
-                "action": action,
-                "success": False,
-                "result": None,
-                "error": str(e),
-                "duration_ms": duration,
-            })
+            step_results.append(
+                {
+                    "step": i + 1,
+                    "action": action,
+                    "success": False,
+                    "result": None,
+                    "error": str(e),
+                    "duration_ms": duration,
+                }
+            )
             # Stop on failure (sequential pipeline)
             break
 
@@ -262,12 +281,14 @@ def pipeline_list() -> list[PipelineInfo]:
 
     # Builtin
     for name, defn in BUILTIN_PIPELINES.items():
-        pipelines.append({
-            "name": name,
-            "description": defn.get("description", ""),
-            "steps_count": len(defn.get("steps", [])),
-            "source": "builtin",
-        })
+        pipelines.append(
+            {
+                "name": name,
+                "description": defn.get("description", ""),
+                "steps_count": len(defn.get("steps", [])),
+                "source": "builtin",
+            }
+        )
 
     # User-defined
     pipelines_dir = _get_pipelines_dir()
@@ -275,12 +296,14 @@ def pipeline_list() -> list[PipelineInfo]:
         try:
             data = yaml.safe_load(f.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                pipelines.append({
-                    "name": f.stem,
-                    "description": data.get("description", ""),
-                    "steps_count": len(data.get("steps", [])),
-                    "source": "user",
-                })
+                pipelines.append(
+                    {
+                        "name": f.stem,
+                        "description": data.get("description", ""),
+                        "steps_count": len(data.get("steps", [])),
+                        "source": "user",
+                    }
+                )
         except yaml.YAMLError:
             continue
 
@@ -306,7 +329,9 @@ def pipeline_create(
         ValidationError: If name conflicts with builtin or steps invalid
     """
     if not name or not name.strip():
-        raise ValidationError("Pipeline name is required.", user_message="Please provide a pipeline name.")
+        raise ValidationError(
+            "Pipeline name is required.", user_message="Please provide a pipeline name."
+        )
 
     if name in BUILTIN_PIPELINES:
         raise ValidationError(
@@ -315,14 +340,16 @@ def pipeline_create(
         )
 
     if not steps:
-        raise ValidationError("At least one step is required.", user_message="Pipeline must have at least one step.")
+        raise ValidationError(
+            "At least one step is required.", user_message="Pipeline must have at least one step."
+        )
 
     # Validate actions
     for i, step in enumerate(steps):
         action = step.get("action", "")
         if action not in VALID_ACTIONS:
             raise ValidationError(
-                f"Step {i+1}: Unknown action '{action}'. Valid: {', '.join(sorted(VALID_ACTIONS))}",
+                f"Step {i + 1}: Unknown action '{action}'. Valid: {', '.join(sorted(VALID_ACTIONS))}",
             )
 
     pipeline_def = {

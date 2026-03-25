@@ -6,10 +6,9 @@ import json
 import logging
 import os
 import threading
-from typing import Any
 
-from notebooklm_tools.core.client import NotebookLMClient, extract_cookies_from_chrome_export
 from notebooklm_tools.core.auth import load_cached_tokens
+from notebooklm_tools.core.client import NotebookLMClient, extract_cookies_from_chrome_export
 
 # MCP request/response logger
 mcp_logger = logging.getLogger("notebooklm_tools.mcp")
@@ -37,18 +36,18 @@ def get_client() -> NotebookLMClient:
     Tries environment variables first, falls back to cached tokens from auth CLI.
     """
     global _client
-    
+
     # Check if we need to reload due to profile switch
     cookie_header = os.environ.get("NOTEBOOKLM_COOKIES", "")
     if not cookie_header and _client is not None:
         try:
             from notebooklm_tools.utils.config import reset_config
-            
+
             # Reset config so we read the latest default_profile from disk
             # in case `nlm login switch` was run in another terminal
             reset_config()
             cached = load_cached_tokens()
-            
+
             # If tokens changed on disk (e.g., profile switch), force re-init
             if cached and getattr(_client, "cookies", None) != cached.cookies:
                 mcp_logger.info("Authentication profile change detected, reloading client.")
@@ -106,6 +105,7 @@ def reset_client() -> None:
 def get_mcp_instance():
     """Get the FastMCP instance. Import here to avoid circular imports."""
     from notebooklm_tools.mcp.server import mcp
+
     return mcp
 
 
@@ -115,66 +115,80 @@ _tool_registry: list[tuple] = []
 
 def logged_tool():
     """Decorator that combines @mcp.tool() with MCP request/response logging.
-    
+
     Tools are registered immediately with the MCP server when decorated.
     Supports both synchronous and asynchronous functions.
     """
+
     def decorator(func):
         is_async = inspect.iscoroutinefunction(func)
-        
+
         if is_async:
+
             @functools.wraps(func)
             async def wrapper(*args, **kwargs):
                 tool_name = func.__name__
                 if mcp_logger.isEnabledFor(logging.DEBUG):
                     params = {k: v for k, v in kwargs.items() if v is not None}
                     mcp_logger.debug(f"MCP Request: {tool_name}({json.dumps(params, default=str)})")
-                
+
                 result = await func(*args, **kwargs)
-                
+
                 if mcp_logger.isEnabledFor(logging.DEBUG):
                     result_str = json.dumps(result, default=str)
                     if len(result_str) > 1000:
                         result_str = result_str[:1000] + "..."
                     mcp_logger.debug(f"MCP Response: {tool_name} -> {result_str}")
-                
+
                 return result
         else:
+
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
                 tool_name = func.__name__
                 if mcp_logger.isEnabledFor(logging.DEBUG):
                     params = {k: v for k, v in kwargs.items() if v is not None}
                     mcp_logger.debug(f"MCP Request: {tool_name}({json.dumps(params, default=str)})")
-                
+
                 result = func(*args, **kwargs)
-                
+
                 if mcp_logger.isEnabledFor(logging.DEBUG):
                     result_str = json.dumps(result, default=str)
                     if len(result_str) > 1000:
                         result_str = result_str[:1000] + "..."
                     mcp_logger.debug(f"MCP Response: {tool_name} -> {result_str}")
-                
+
                 return result
-        
+
         # Store for later registration
         _tool_registry.append((func.__name__, wrapper))
         return wrapper
+
     return decorator
 
 
 def register_all_tools(mcp):
     """Register all collected tools with the MCP instance."""
-    for name, wrapper in _tool_registry:
+    for _name, wrapper in _tool_registry:
         mcp.tool()(wrapper)
 
 
 # Essential cookies for NotebookLM API authentication
 ESSENTIAL_COOKIES = [
-    "SID", "HSID", "SSID", "APISID", "SAPISID",  # Core auth cookies
-    "__Secure-1PSID", "__Secure-3PSID",  # Secure session variants
-    "__Secure-1PAPISID", "__Secure-3PAPISID",  # Secure API variants
-    "OSID", "__Secure-OSID",  # Origin-bound session
-    "__Secure-1PSIDTS", "__Secure-3PSIDTS",  # Timestamp tokens (rotate frequently)
-    "SIDCC", "__Secure-1PSIDCC", "__Secure-3PSIDCC",  # Session cookies (rotate frequently)
+    "SID",
+    "HSID",
+    "SSID",
+    "APISID",
+    "SAPISID",  # Core auth cookies
+    "__Secure-1PSID",
+    "__Secure-3PSID",  # Secure session variants
+    "__Secure-1PAPISID",
+    "__Secure-3PAPISID",  # Secure API variants
+    "OSID",
+    "__Secure-OSID",  # Origin-bound session
+    "__Secure-1PSIDTS",
+    "__Secure-3PSIDTS",  # Timestamp tokens (rotate frequently)
+    "SIDCC",
+    "__Secure-1PSIDCC",
+    "__Secure-3PSIDCC",  # Session cookies (rotate frequently)
 ]

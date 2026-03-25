@@ -1,10 +1,10 @@
 """Research service — shared business logic for research start, poll, and import."""
 
-from typing import TypedDict, Optional, Literal
+from typing import TypedDict
 
 from ..core.client import NotebookLMClient
 from ..core.errors import RPCError
-from .errors import ValidationError, ServiceError
+from .errors import ServiceError, ValidationError
 
 VALID_SOURCES = ("web", "drive")
 VALID_MODES = ("fast", "deep")
@@ -12,6 +12,7 @@ VALID_MODES = ("fast", "deep")
 
 class ResearchStartResult(TypedDict):
     """Result of starting a research task."""
+
     task_id: str
     notebook_id: str
     query: str
@@ -22,17 +23,19 @@ class ResearchStartResult(TypedDict):
 
 class ResearchStatusResult(TypedDict):
     """Result of polling research status."""
+
     status: str
     notebook_id: str
-    task_id: Optional[str]
+    task_id: str | None
     sources_found: int
     sources: list
     report: str
-    message: Optional[str]
+    message: str | None
 
 
 class ResearchImportResult(TypedDict):
     """Result of importing research sources."""
+
     notebook_id: str
     imported_count: int
     imported_sources: list
@@ -100,9 +103,9 @@ def start_research(
                 f"Failed to start research — Google API error code {e.error_code} ({short_detail}).\n"
                 f"This is likely a transient issue. Try again in a few minutes, or use --mode fast."
             ),
-        )
+        ) from e
     except Exception as e:
-        raise ServiceError(f"Failed to start research: {e}")
+        raise ServiceError(f"Failed to start research: {e}") from e
 
     if result:
         return {
@@ -123,8 +126,8 @@ def start_research(
 def poll_research(
     client: NotebookLMClient,
     notebook_id: str,
-    task_id: Optional[str] = None,
-    query: Optional[str] = None,
+    task_id: str | None = None,
+    query: str | None = None,
     compact: bool = True,
 ) -> ResearchStatusResult:
     """Poll research progress (single check).
@@ -149,7 +152,7 @@ def poll_research(
             target_query=query,
         )
     except Exception as e:
-        raise ServiceError(f"Failed to poll research: {e}")
+        raise ServiceError(f"Failed to poll research: {e}") from e
 
     if not result:
         return {
@@ -181,7 +184,9 @@ def poll_research(
         "sources_found": len(result.get("sources", [])),
         "sources": sources,
         "report": report,
-        "message": "Use research_import to add sources to notebook." if status == "completed" else None,
+        "message": "Use research_import to add sources to notebook."
+        if status == "completed"
+        else None,
     }
 
 
@@ -189,7 +194,7 @@ def import_research(
     client: NotebookLMClient,
     notebook_id: str,
     task_id: str,
-    source_indices: Optional[list[int]] = None,
+    source_indices: list[int] | None = None,
     timeout: float = 300.0,
 ) -> ResearchImportResult:
     """Import discovered sources from a completed research task.
@@ -213,7 +218,7 @@ def import_research(
             target_task_id=task_id,
         )
     except Exception as e:
-        raise ServiceError(f"Failed to retrieve research results: {e}")
+        raise ServiceError(f"Failed to retrieve research results: {e}") from e
 
     if not research_result or research_result.get("status") == "no_research":
         raise ServiceError(
@@ -231,9 +236,7 @@ def import_research(
     # Filter by indices if provided
     if source_indices is not None:
         sources_to_import = [
-            all_sources[idx]
-            for idx in source_indices
-            if 0 <= idx < len(all_sources)
+            all_sources[idx] for idx in source_indices if 0 <= idx < len(all_sources)
         ]
     else:
         sources_to_import = all_sources
@@ -252,7 +255,7 @@ def import_research(
             timeout=timeout,
         )
     except Exception as e:
-        raise ServiceError(f"Failed to import sources: {e}")
+        raise ServiceError(f"Failed to import sources: {e}") from e
 
     if result:
         return {

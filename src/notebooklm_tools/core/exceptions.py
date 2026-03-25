@@ -39,7 +39,9 @@ class NotFoundError(NLMError):
     ) -> None:
         message = f"{resource_type} not found: {resource_id}"
         if hint is None:
-            hint = f"Run 'nlm {resource_type.lower()} list' to see available {resource_type.lower()}s."
+            hint = (
+                f"Run 'nlm {resource_type.lower()} list' to see available {resource_type.lower()}s."
+            )
         super().__init__(message, hint)
         self.resource_type = resource_type
         self.resource_id = resource_id
@@ -132,11 +134,16 @@ class FileUploadError(NLMError):
 
     def __init__(self, filename: str, message: str = ""):
         self.filename = filename
-        super().__init__(f"Failed to upload '{filename}': {message}" if message else f"Failed to upload '{filename}'")
+        super().__init__(
+            f"Failed to upload '{filename}': {message}"
+            if message
+            else f"Failed to upload '{filename}'"
+        )
 
 
 class FileValidationError(NLMError):
     """Raised when file validation fails before upload."""
+
     pass
 
 

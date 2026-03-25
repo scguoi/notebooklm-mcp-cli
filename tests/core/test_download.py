@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Tests for DownloadMixin."""
 
-import pytest
-
 from notebooklm_tools.core.base import BaseClient
 from notebooklm_tools.core.download import DownloadMixin
 
@@ -95,7 +93,7 @@ class TestDownloadMixinMethods:
                     {"text": "3", "isCorrect": False},
                     {"text": "4", "isCorrect": True},
                 ],
-                "hint": "Think simple"
+                "hint": "Think simple",
             }
         ]
         result = DownloadMixin._format_quiz_markdown("Test Quiz", questions)
@@ -108,9 +106,7 @@ class TestDownloadMixinMethods:
 
     def test_format_flashcards_markdown(self):
         """Test flashcard markdown formatting."""
-        cards = [
-            {"f": "Front text", "b": "Back text"}
-        ]
+        cards = [{"f": "Front text", "b": "Back text"}]
         result = DownloadMixin._format_flashcards_markdown("Test Deck", cards)
         assert "# Test Deck" in result
         assert "## Card 1" in result

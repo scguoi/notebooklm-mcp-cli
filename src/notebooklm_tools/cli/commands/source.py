@@ -1,15 +1,14 @@
 """Source CLI commands."""
 
-from typing import Optional
-
 import typer
 from rich.console import Console
 
-from notebooklm_tools.core.alias import get_alias_manager
-from notebooklm_tools.core.exceptions import NLMError
 from notebooklm_tools.cli.formatters import detect_output_format, get_formatter
 from notebooklm_tools.cli.utils import get_client, handle_error
-from notebooklm_tools.services import sources as sources_service, ServiceError
+from notebooklm_tools.core.alias import get_alias_manager
+from notebooklm_tools.core.exceptions import NLMError
+from notebooklm_tools.services import ServiceError
+from notebooklm_tools.services import sources as sources_service
 
 console = Console()
 app = typer.Typer(
@@ -23,12 +22,16 @@ app = typer.Typer(
 def list_sources(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     full: bool = typer.Option(False, "--full", "-a", help="Show all columns"),
-    drive: bool = typer.Option(False, "--drive", "-d", help="Show Drive sources with freshness status"),
-    skip_freshness: bool = typer.Option(False, "--skip-freshness", "-S", help="Skip freshness checks (faster, use with --drive)"),
+    drive: bool = typer.Option(
+        False, "--drive", "-d", help="Show Drive sources with freshness status"
+    ),
+    skip_freshness: bool = typer.Option(
+        False, "--skip-freshness", "-S", help="Skip freshness checks (faster, use with --drive)"
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Output IDs only"),
     url: bool = typer.Option(False, "--url", "-u", help="Output as ID: URL"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """List sources in a notebook."""
     try:
@@ -38,7 +41,7 @@ def list_sources(
                 sources = client.get_notebook_sources_with_types(notebook_id)
                 if not skip_freshness:
                     for src in sources:
-                        src['is_fresh'] = client.check_source_freshness(src['id'])
+                        src["is_fresh"] = client.check_source_freshness(src["id"])
             else:
                 sources = client.get_notebook_sources_with_types(notebook_id)
 
@@ -46,21 +49,25 @@ def list_sources(
         formatter = get_formatter(fmt, console)
         formatter.format_sources(sources, full=full or drive, url_only=url)
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("add")
 def add_source(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
-    url: Optional[list[str]] = typer.Option(None, "--url", "-u", help="URL to add (repeatable for bulk)"),
-    text: Optional[str] = typer.Option(None, "--text", "-t", help="Text content to add"),
-    drive: Optional[str] = typer.Option(None, "--drive", "-d", help="Google Drive document ID"),
-    youtube: Optional[list[str]] = typer.Option(None, "--youtube", "-y", help="YouTube URL (repeatable for bulk)"),
-    file: Optional[str] = typer.Option(None, "--file", "-f", help="Local file to upload (PDF, etc.)"),
+    url: list[str] | None = typer.Option(  # noqa: B008
+        None, "--url", "-u", help="URL to add (repeatable for bulk)"
+    ),
+    text: str | None = typer.Option(None, "--text", "-t", help="Text content to add"),
+    drive: str | None = typer.Option(None, "--drive", "-d", help="Google Drive document ID"),
+    youtube: list[str] | None = typer.Option(  # noqa: B008
+        None, "--youtube", "-y", help="YouTube URL (repeatable for bulk)"
+    ),
+    file: str | None = typer.Option(None, "--file", "-f", help="Local file to upload (PDF, etc.)"),
     title: str = typer.Option("", "--title", help="Title for the source"),
     doc_type: str = typer.Option("doc", "--type", help="Drive doc type: doc, slides, sheets, pdf"),
     wait: bool = typer.Option(False, "--wait", "-w", help="Wait for source processing to complete"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Add a source to a notebook.
 
@@ -88,7 +95,9 @@ def add_source(
     # Validate that exactly one source type is provided (CLI-specific UX)
     source_count = sum(1 for x in [has_url, text, drive, has_youtube, file] if x)
     if source_count == 0:
-        console.print("[red]Error:[/red] Please specify a source: --url, --text, --file, --drive, or --youtube")
+        console.print(
+            "[red]Error:[/red] Please specify a source: --url, --text, --file, --drive, or --youtube"
+        )
         raise typer.Exit(1)
     if source_count > 1:
         console.print("[red]Error:[/red] Please specify only one source type at a time")
@@ -100,11 +109,14 @@ def add_source(
             all_urls = urls + youtubes
             if len(all_urls) > 1:
                 if wait:
-                    console.print(f"[blue]Adding {len(all_urls)} URLs and waiting for processing...[/blue]")
+                    console.print(
+                        f"[blue]Adding {len(all_urls)} URLs and waiting for processing...[/blue]"
+                    )
                 else:
                     console.print(f"[blue]Adding {len(all_urls)} URLs...[/blue]")
                 bulk_result = sources_service.add_sources(
-                    client, notebook_id,
+                    client,
+                    notebook_id,
                     [{"source_type": "url", "url": u} for u in all_urls],
                     wait=wait,
                 )
@@ -127,34 +139,53 @@ def add_source(
                 if wait:
                     console.print(f"[blue]Adding {source_url} and waiting for processing...[/blue]")
                 result = sources_service.add_source(
-                    client, notebook_id, "url",
-                    url=source_url, wait=wait,
+                    client,
+                    notebook_id,
+                    "url",
+                    url=source_url,
+                    wait=wait,
                 )
             elif text:
                 if wait:
                     console.print("[blue]Adding text and waiting for processing...[/blue]")
                 result = sources_service.add_source(
-                    client, notebook_id, "text",
-                    text=text, title=title or None, wait=wait,
+                    client,
+                    notebook_id,
+                    "text",
+                    text=text,
+                    title=title or None,
+                    wait=wait,
                 )
             elif drive:
                 if wait:
-                    console.print("[blue]Adding Drive document and waiting for processing...[/blue]")
+                    console.print(
+                        "[blue]Adding Drive document and waiting for processing...[/blue]"
+                    )
                 result = sources_service.add_source(
-                    client, notebook_id, "drive",
-                    document_id=drive, title=title or None,
-                    doc_type=doc_type, wait=wait,
+                    client,
+                    notebook_id,
+                    "drive",
+                    document_id=drive,
+                    title=title or None,
+                    doc_type=doc_type,
+                    wait=wait,
                 )
             elif file:
                 from pathlib import Path
+
                 file_path = Path(file).expanduser().resolve()
                 if not file_path.exists():
                     console.print(f"[red]Error:[/red] File not found: {file}")
                     raise typer.Exit(1)
-                console.print(f"[blue]Uploading {file_path.name}{'...' if not wait else ' and waiting for processing...'}[/blue]")
+                console.print(
+                    f"[blue]Uploading {file_path.name}{'...' if not wait else ' and waiting for processing...'}[/blue]"
+                )
                 result = sources_service.add_source(
-                    client, notebook_id, "file",
-                    file_path=str(file_path), wait=wait,
+                    client,
+                    notebook_id,
+                    "file",
+                    file_path=str(file_path),
+                    wait=wait,
                 )
             else:
                 raise typer.Exit(1)
@@ -164,14 +195,14 @@ def add_source(
         console.print(f"[green]✓[/green] Added source: {result['title']}{ready_msg}")
         console.print(f"[dim]Source ID: {result['source_id']}[/dim]")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("get")
 def get_source(
     source_id: str = typer.Argument(..., help="Source ID"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Get source details."""
     try:
@@ -183,14 +214,14 @@ def get_source(
         formatter = get_formatter(fmt, console)
         formatter.format_item(source, title="Source Details")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("describe")
 def describe_source(
     source_id: str = typer.Argument(..., help="Source ID"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Get AI-generated source summary with keywords."""
     try:
@@ -202,15 +233,15 @@ def describe_source(
         formatter = get_formatter(fmt, console)
         formatter.format_item(summary, title="Source Summary")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("content")
 def get_source_content(
     source_id: str = typer.Argument(..., help="Source ID"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Write content to file"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    output: str | None = typer.Option(None, "--output", "-o", help="Write content to file"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Get raw source content (no AI processing)."""
     try:
@@ -220,22 +251,27 @@ def get_source_content(
 
         if output:
             from pathlib import Path
+
             Path(output).write_text(content["content"])
-            console.print(f"[green]✓[/green] Wrote {content['char_count']:,} characters to {output}")
+            console.print(
+                f"[green]✓[/green] Wrote {content['char_count']:,} characters to {output}"
+            )
         else:
             fmt = detect_output_format(json_output)
             formatter = get_formatter(fmt, console)
             formatter.format_item(content, title="Source Content")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("rename")
 def rename_source(
     source_id: str = typer.Argument(..., help="Source ID"),
     title: str = typer.Argument(..., help="New title"),
-    notebook_id: str = typer.Option(..., "--notebook", "-n", help="Notebook ID containing the source"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    notebook_id: str = typer.Option(
+        ..., "--notebook", "-n", help="Notebook ID containing the source"
+    ),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Rename a source."""
     source_id = get_alias_manager().resolve(source_id)
@@ -247,14 +283,14 @@ def rename_source(
         console.print(f"[green]✓[/green] Renamed source to: {result['title']}")
         console.print(f"[dim]Source ID: {result['source_id']}[/dim]")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("delete")
 def delete_source(
-    source_ids: list[str] = typer.Argument(..., help="Source ID(s) to delete"),
+    source_ids: list[str] = typer.Argument(..., help="Source ID(s) to delete"),  # noqa: B008
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Delete source(s) permanently.
 
@@ -287,14 +323,14 @@ def delete_source(
                 sources_service.delete_sources(client, resolved_ids)
                 console.print(f"[green]✓[/green] Deleted {len(resolved_ids)} sources")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("stale")
 def list_stale_sources(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """List Drive sources that need syncing."""
     try:
@@ -302,7 +338,7 @@ def list_stale_sources(
         with get_client(profile) as client:
             sources = client.get_notebook_sources_with_types(notebook_id)
 
-        stale_sources = [s for s in sources if not s.get('is_fresh', True)]
+        stale_sources = [s for s in sources if not s.get("is_fresh", True)]
 
         if not stale_sources:
             console.print("[green]✓[/green] All Drive sources are up to date.")
@@ -316,18 +352,20 @@ def list_stale_sources(
 
         console.print("\n[dim]Run 'nlm source sync <notebook-id>' to sync all stale sources.[/dim]")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("sync")
 def sync_sources(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
-    source_ids: Optional[str] = typer.Option(
-        None, "--source-ids", "-s",
+    source_ids: str | None = typer.Option(
+        None,
+        "--source-ids",
+        "-s",
         help="Comma-separated source IDs to sync (default: all stale)",
     ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Sync Drive sources with latest content."""
     try:
@@ -335,10 +373,12 @@ def sync_sources(
 
         with get_client(profile) as client:
             if source_ids:
-                ids_to_sync = [get_alias_manager().resolve(sid.strip()) for sid in source_ids.split(",")]
+                ids_to_sync = [
+                    get_alias_manager().resolve(sid.strip()) for sid in source_ids.split(",")
+                ]
             else:
                 sources = client.get_notebook_sources_with_types(notebook_id)
-                ids_to_sync = [s['id'] for s in sources if not s.get('is_fresh', True)]
+                ids_to_sync = [s["id"] for s in sources if not s.get("is_fresh", True)]
 
         if not ids_to_sync:
             console.print("[green]✓[/green] No sources need syncing.")
@@ -356,4 +396,4 @@ def sync_sources(
         synced = sum(1 for r in results if r.get("synced"))
         console.print(f"[green]✓[/green] Synced {synced} source(s)")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))

@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 from rich.syntax import Syntax
 
-from notebooklm_tools.utils.config import get_config, save_config, _config_to_toml
+from notebooklm_tools.utils.config import _config_to_toml, get_config, save_config
 
 console = Console()
 app = typer.Typer(
@@ -20,9 +20,10 @@ def show_config(
 ) -> None:
     """Show current configuration."""
     config = get_config()
-    
+
     if json_output:
         import json
+
         print(json.dumps(config.model_dump(), indent=2))
     else:
         # Print as TOML syntax highlighted
@@ -38,10 +39,10 @@ def get_config_value(
     """Get a specific configuration value."""
     config = get_config()
     conf_dict = config.model_dump()
-    
+
     parts = key.split(".")
     current = conf_dict
-    
+
     try:
         for part in parts:
             if isinstance(current, dict) and part in current:
@@ -49,7 +50,7 @@ def get_config_value(
             else:
                 console.print(f"[red]Error:[/red] Key '{key}' not found.")
                 raise typer.Exit(1)
-        
+
         # Format output based on type
         if isinstance(current, bool):
             val_str = str(current).lower()
@@ -57,10 +58,10 @@ def get_config_value(
             console.print(f"[{color}]{val_str}[/{color}]")
         else:
             console.print(str(current))
-            
+
     except Exception as e:
         console.print(f"[red]Error:[/red] {str(e)}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("set")
@@ -70,31 +71,31 @@ def set_config_value(
 ) -> None:
     """Set a configuration value."""
     config = get_config()
-    
+
     parts = key.split(".")
     if len(parts) != 2:
         console.print("[red]Error:[/red] Invalid key format. Use section.key (e.g. output.format)")
         raise typer.Exit(1)
-        
+
     section, field = parts
-    
+
     # Validate section
     if not hasattr(config, section):
         console.print(f"[red]Error:[/red] Unknown section '{section}'")
         raise typer.Exit(1)
-        
+
     section_obj = getattr(config, section)
-    
+
     # Validate field
     if not hasattr(section_obj, field):
         console.print(f"[red]Error:[/red] Unknown field '{field}' in section '{section}'")
         raise typer.Exit(1)
-        
+
     # Get field info for type conversion
     # Pydantic v2 uses model_fields
     field_info = section_obj.model_fields.get(field)
     target_type = field_info.annotation
-    
+
     try:
         # Handle boolean conversion explicitly
         if target_type is bool:
@@ -113,17 +114,17 @@ def set_config_value(
                 converted_val = float(value)
             else:
                 converted_val = value  # Default to string
-        
+
         # Update the model
         setattr(section_obj, field, converted_val)
-        
+
         # Save changes
         save_config(config)
         console.print(f"[green]✓[/green] Set {key} = {converted_val}")
-        
+
     except ValueError as e:
         console.print(f"[red]Error:[/red] Invalid value for {key}: {str(e)}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Error:[/red] Failed to update config: {str(e)}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e

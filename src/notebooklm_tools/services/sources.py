@@ -1,9 +1,9 @@
 """Sources service — shared validation and logic for source management."""
 
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 from ..core.client import NotebookLMClient
-from .errors import ValidationError, ServiceError
+from .errors import ServiceError, ValidationError
 
 VALID_SOURCE_TYPES = ("url", "text", "drive", "file")
 VALID_DRIVE_DOC_TYPES = ("doc", "slides", "sheets", "pdf")
@@ -19,6 +19,7 @@ DRIVE_MIME_TYPES = {
 
 class AddSourceResult(TypedDict):
     """Result of adding a source."""
+
     source_type: str
     source_id: str
     title: str
@@ -26,22 +27,25 @@ class AddSourceResult(TypedDict):
 
 class DriveSourceInfo(TypedDict, total=False):
     """Info about a Drive source including freshness."""
+
     id: str
     title: str
     type: str
-    stale: Optional[bool]
-    drive_doc_id: Optional[str]
+    stale: bool | None
+    drive_doc_id: str | None
 
 
 class SyncResult(TypedDict):
     """Result of syncing Drive sources."""
+
     source_id: str
     synced: bool
-    error: Optional[str]
+    error: str | None
 
 
 class SourceContentResult(TypedDict):
     """Result of getting source content."""
+
     content: str
     title: str
     source_type: str
@@ -50,18 +54,21 @@ class SourceContentResult(TypedDict):
 
 class RenameResult(TypedDict):
     """Result of renaming a source."""
+
     source_id: str
     title: str
 
 
 class DescribeResult(TypedDict):
     """Result of describing a source."""
+
     summary: str
     keywords: list[str]
 
 
 class DriveListResult(TypedDict):
     """Result of listing Drive sources."""
+
     drive_sources: list[DriveSourceInfo]
     other_sources: list[dict]
     drive_count: int
@@ -70,6 +77,7 @@ class DriveListResult(TypedDict):
 
 class BulkAddResult(TypedDict):
     """Result of bulk adding sources."""
+
     results: list[AddSourceResult]
     added_count: int
 
@@ -78,8 +86,7 @@ def validate_source_type(source_type: str) -> None:
     """Validate source type. Raises ValidationError if invalid."""
     if source_type not in VALID_SOURCE_TYPES:
         raise ValidationError(
-            f"Unknown source type '{source_type}'. "
-            f"Valid types: {', '.join(VALID_SOURCE_TYPES)}",
+            f"Unknown source type '{source_type}'. Valid types: {', '.join(VALID_SOURCE_TYPES)}",
         )
 
 
@@ -96,11 +103,11 @@ def add_source(
     notebook_id: str,
     source_type: str,
     *,
-    url: Optional[str] = None,
-    text: Optional[str] = None,
-    title: Optional[str] = None,
-    file_path: Optional[str] = None,
-    document_id: Optional[str] = None,
+    url: str | None = None,
+    text: str | None = None,
+    title: str | None = None,
+    file_path: str | None = None,
+    document_id: str | None = None,
     doc_type: str = "doc",
     wait: bool = False,
     wait_timeout: float = 120.0,
@@ -143,8 +150,11 @@ def add_source(
                 raise ValidationError("text is required for source_type='text'")
             effective_title = title or "Pasted Text"
             result = client.add_text_source(
-                notebook_id, text, effective_title,
-                wait=wait, wait_timeout=wait_timeout,
+                notebook_id,
+                text,
+                effective_title,
+                wait=wait,
+                wait_timeout=wait_timeout,
             )
             return _extract_result(result, "text", effective_title)
 
@@ -154,8 +164,12 @@ def add_source(
             effective_title = title or "Drive Document"
             mime_type = resolve_drive_mime_type(doc_type)
             result = client.add_drive_source(
-                notebook_id, document_id, effective_title, mime_type,
-                wait=wait, wait_timeout=wait_timeout,
+                notebook_id,
+                document_id,
+                effective_title,
+                mime_type,
+                wait=wait,
+                wait_timeout=wait_timeout,
             )
             return _extract_result(result, "drive", effective_title)
 
@@ -169,19 +183,25 @@ def add_source(
     except (ValidationError, ServiceError):
         raise
     except Exception as e:
-        hint = "Check the URL is accessible. For YouTube, ensure the video is public." if source_type == "url" else None
+        hint = (
+            "Check the URL is accessible. For YouTube, ensure the video is public."
+            if source_type == "url"
+            else None
+        )
         raise ServiceError(
             f"Failed to add {source_type} source: {e}",
             user_message=f"Could not add {source_type} source.",
             hint=hint,
-        )
+        ) from e
 
     # Should never reach here due to validate_source_type above
     raise ServiceError(f"Unexpected source type: {source_type}")
 
 
 def _extract_result(
-    result: Optional[dict], source_type: str, fallback_title: str,
+    result: dict | None,
+    source_type: str,
+    fallback_title: str,
 ) -> AddSourceResult:
     """Extract AddSourceResult from client response."""
     if not result or not result.get("id"):
@@ -255,15 +275,20 @@ def add_sources(
 
         try:
             raw_results = client.add_url_sources(
-                notebook_id, urls, wait=wait, wait_timeout=wait_timeout,
+                notebook_id,
+                urls,
+                wait=wait,
+                wait_timeout=wait_timeout,
             )
             for i, raw in enumerate(raw_results):
                 if raw and raw.get("id"):
-                    results.append({
-                        "source_type": "url",
-                        "source_id": raw["id"],
-                        "title": raw.get("title", urls[i]),
-                    })
+                    results.append(
+                        {
+                            "source_type": "url",
+                            "source_id": raw["id"],
+                            "title": raw.get("title", urls[i]),
+                        }
+                    )
                 else:
                     raise ServiceError(
                         f"Failed to add URL source '{urls[i]}' — no ID returned",
@@ -275,19 +300,22 @@ def add_sources(
             raise ServiceError(
                 f"Failed to batch-add URL sources: {e}",
                 user_message="Could not add URL sources.",
-                hint="Check the URLs are accessible. For YouTube, ensure the videos are public."
-            )
+                hint="Check the URLs are accessible. For YouTube, ensure the videos are public.",
+            ) from e
 
     # Add non-URL sources individually
     for src in other_sources:
         result = add_source(
-            client, notebook_id, src["source_type"],
+            client,
+            notebook_id,
+            src["source_type"],
             text=src.get("text"),
             title=src.get("title"),
             file_path=src.get("file_path"),
             document_id=src.get("document_id"),
             doc_type=src.get("doc_type", "doc"),
-            wait=wait, wait_timeout=wait_timeout,
+            wait=wait,
+            wait_timeout=wait_timeout,
         )
         results.append(result)
 
@@ -319,7 +347,7 @@ def list_drive_sources(
         raise ServiceError(
             f"Failed to list sources: {e}",
             user_message="Could not list notebook sources.",
-        )
+        ) from e
 
     drive_sources: list[DriveSourceInfo] = []
     other_sources: list[dict] = []
@@ -418,7 +446,7 @@ def rename_source(
         raise ServiceError(
             f"Failed to rename source {source_id}: {e}",
             user_message="Failed to rename source.",
-        )
+        ) from e
 
 
 def delete_source(
@@ -447,7 +475,7 @@ def delete_source(
         raise ServiceError(
             f"Failed to delete source {source_id}: {e}",
             user_message="Failed to delete source.",
-        )
+        ) from e
 
 
 def delete_sources(
@@ -480,7 +508,7 @@ def delete_sources(
         raise ServiceError(
             f"Failed to delete {len(source_ids)} sources: {e}",
             user_message="Failed to delete sources.",
-        )
+        ) from e
 
 
 def describe_source(
@@ -516,7 +544,7 @@ def describe_source(
         raise ServiceError(
             f"Failed to describe source {source_id}: {e}",
             user_message="Failed to get source summary.",
-        )
+        ) from e
 
 
 def get_source_content(
@@ -555,4 +583,4 @@ def get_source_content(
         raise ServiceError(
             f"Failed to get content for source {source_id}: {e}",
             user_message="Failed to get source content.",
-        )
+        ) from e

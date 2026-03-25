@@ -2,8 +2,9 @@
 
 from typing import Any
 
+from ...services import ServiceError
+from ...services import chat as chat_service
 from ._utils import get_client, get_query_timeout, logged_tool
-from ...services import chat as chat_service, ServiceError
 
 
 @logged_tool()
@@ -29,7 +30,9 @@ def notebook_query(
         client = get_client()
         effective_timeout = timeout or get_query_timeout()
         result = chat_service.query(
-            client, notebook_id, query,
+            client,
+            notebook_id,
+            query,
             source_ids=source_ids,
             conversation_id=conversation_id,
             timeout=effective_timeout,
@@ -62,7 +65,8 @@ def chat_configure(
     try:
         client = get_client()
         result = chat_service.configure_chat(
-            client, notebook_id,
+            client,
+            notebook_id,
             goal=goal,
             custom_prompt=custom_prompt,
             response_length=response_length,

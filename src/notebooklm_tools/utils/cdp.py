@@ -22,7 +22,7 @@ from urllib.parse import quote, urlparse
 from httpx import Client
 
 httpx_client = Client()
-import websocket
+import websocket  # noqa: E402
 
 _cached_ws: websocket.WebSocket | None = None
 _cached_ws_url: str | None = None
@@ -42,7 +42,8 @@ def _normalize_ws_url(url: str | None) -> str | None:
         url = url.replace("://localhost:", "://127.0.0.1:")
     return url
 
-from notebooklm_tools.core.exceptions import AuthenticationError
+
+from notebooklm_tools.core.exceptions import AuthenticationError  # noqa: E402
 
 __all__ = [
     "get_chrome_path",
@@ -59,7 +60,7 @@ CDP_DEFAULT_PORT = 9222
 CDP_PORT_RANGE = range(9222, 9232)  # Ports to scan for existing/available
 NOTEBOOKLM_URL = "https://notebooklm.google.com/"
 
-import logging as _logging
+import logging as _logging  # noqa: E402
 
 _logger = _logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ def _read_port_map() -> dict[str, dict]:
 def _save_port_map(data: dict[str, dict]) -> None:
     """Write port map to disk."""
     map_file = _get_port_map_file()
-    try:
+    try:  # noqa: SIM105
         map_file.write_text(json.dumps(data, indent=2))
     except OSError:
         pass  # Best-effort
@@ -291,6 +292,7 @@ def _get_preferred_browser() -> str:
     """Read the auth.browser config setting (default: 'auto')."""
     try:
         from notebooklm_tools.utils.config import load_config
+
         return load_config().auth.browser.lower().strip()
     except Exception:
         return "auto"
@@ -380,7 +382,9 @@ def get_supported_browsers() -> list[str]:
 
 
 # Import Chrome profile directory from unified config
-from notebooklm_tools.utils.config import get_chrome_profile_dir
+import contextlib  # noqa: E402
+
+from notebooklm_tools.utils.config import get_chrome_profile_dir  # noqa: E402
 
 
 def is_profile_locked(profile_name: str = "default") -> bool:
@@ -460,7 +464,9 @@ def launch_chrome_process(
     except Exception as e:
         _logger.error(
             "Failed to launch browser at '%s' on port %d: %s",
-            chrome_path, port, e,
+            chrome_path,
+            port,
+            e,
         )
         return None
 
@@ -518,10 +524,8 @@ def terminate_chrome(process: subprocess.Popen | None = None, port: int | None =
             process.terminate()
             process.wait(timeout=5)
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
                 process.kill()
-            except Exception:
-                pass
 
     # Clean up port map
     effective_port = port or _chrome_port
@@ -701,9 +705,7 @@ def is_logged_in(url: str) -> bool:
     """
     if "accounts.google.com" in url:
         return False
-    if "notebooklm.google.com" in url:
-        return True
-    return False
+    return "notebooklm.google.com" in url
 
 
 def extract_build_label(html: str) -> str:
@@ -748,7 +750,7 @@ def extract_email(html: str) -> str:
         matches = re.findall(pattern, html)
         for match in matches:
             # Filter out common false positives
-            if "@google.com" not in match and "@gstatic" not in match:
+            if "@google.com" not in match and "@gstatic" not in match:  # noqa: SIM102
                 if "@" in match and "." in match.split("@")[-1]:
                     return match
     return ""
@@ -826,7 +828,7 @@ def extract_cookies_via_cdp(
             raise AuthenticationError(
                 message=str(e),
                 hint="Close some browser instances and try again.",
-            )
+            ) from e
 
         if not launch_chrome(port, profile_name=profile_name):
             raise AuthenticationError(
@@ -846,7 +848,6 @@ def extract_cookies_via_cdp(
     result = extract_cookies_from_page(f"http://localhost:{port}", wait_for_login, login_timeout)
     result["reused_existing"] = reused_existing
     return result
-
 
 
 def extract_cookies_via_existing_cdp(
@@ -1009,7 +1010,7 @@ def run_headless_auth(
     port: int = 9223,
     timeout: int = 30,
     profile_name: str = "default",
-) -> "AuthTokens | None":
+) -> "Any | None":
     """Run authentication in headless mode (no user interaction).
 
     This only works if the Chrome profile already has saved Google login.

@@ -2,13 +2,13 @@
 """Tests for artifact exception classes."""
 
 from notebooklm_tools.core.errors import (
-    NotebookLMError,
+    ArtifactDownloadError,
     ArtifactError,
+    ArtifactNotFoundError,
     ArtifactNotReadyError,
     ArtifactParseError,
-    ArtifactDownloadError,
-    ArtifactNotFoundError,
     ClientAuthenticationError,
+    NotebookLMError,
 )
 
 

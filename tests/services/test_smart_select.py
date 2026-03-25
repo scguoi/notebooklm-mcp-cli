@@ -1,20 +1,17 @@
 """Tests for smart_select service — tag management and intelligent notebook selection."""
 
 import json
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from notebooklm_tools.services.errors import NotFoundError, ValidationError
 from notebooklm_tools.services.smart_select import (
-    tag_add,
-    tag_remove,
-    tag_list,
     smart_select,
-    _load_tags,
-    _save_tags,
+    tag_add,
+    tag_list,
+    tag_remove,
 )
-from notebooklm_tools.services.errors import ValidationError, NotFoundError
 
 
 @pytest.fixture

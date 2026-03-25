@@ -1,22 +1,23 @@
 """Tests for services.notebooks module."""
 
-import pytest
-from unittest.mock import MagicMock
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
-from notebooklm_tools.services.notebooks import (
-    list_notebooks,
-    get_notebook,
-    describe_notebook,
-    create_notebook,
-    rename_notebook,
-    delete_notebook,
-)
+import pytest
+
 from notebooklm_tools.services.errors import (
+    CreationError,
+    NotFoundError,
     ServiceError,
     ValidationError,
-    NotFoundError,
-    CreationError,
+)
+from notebooklm_tools.services.notebooks import (
+    create_notebook,
+    delete_notebook,
+    describe_notebook,
+    get_notebook,
+    list_notebooks,
+    rename_notebook,
 )
 
 
@@ -61,9 +62,7 @@ class TestListNotebooks:
         assert len(result["notebooks"]) == 3
 
     def test_max_results_truncates(self, mock_client):
-        mock_client.list_notebooks.return_value = [
-            _make_notebook(id=f"nb-{i}") for i in range(10)
-        ]
+        mock_client.list_notebooks.return_value = [_make_notebook(id=f"nb-{i}") for i in range(10)]
 
         result = list_notebooks(mock_client, max_results=3)
 
@@ -91,12 +90,12 @@ class TestGetNotebook:
         # Simulate the nested list structure from the API
         mock_client.get_notebook.return_value = [
             [
-                "My Notebook",       # title
-                [                     # sources
+                "My Notebook",  # title
+                [  # sources
                     [["src-1"], "Source A"],
                     [["src-2"], "Source B"],
                 ],
-                "nb-123",            # id
+                "nb-123",  # id
             ]
         ]
 

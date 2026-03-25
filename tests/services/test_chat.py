@@ -1,10 +1,11 @@
 """Tests for services.chat module."""
 
-import pytest
 from unittest.mock import MagicMock
 
-from notebooklm_tools.services.chat import query, configure_chat, delete_chat_history
-from notebooklm_tools.services.errors import ValidationError, ServiceError
+import pytest
+
+from notebooklm_tools.services.chat import configure_chat, delete_chat_history, query
+from notebooklm_tools.services.errors import ServiceError, ValidationError
 
 
 @pytest.fixture
@@ -95,7 +96,8 @@ class TestConfigureChat:
         mock_client.configure_chat.return_value = {"status": "ok"}
 
         result = configure_chat(
-            mock_client, "nb-123",
+            mock_client,
+            "nb-123",
             goal="custom",
             custom_prompt="Be a pirate.",
         )
@@ -106,7 +108,8 @@ class TestConfigureChat:
         long_prompt = "x" * 10_001
         with pytest.raises(ValidationError, match="10000 character"):
             configure_chat(
-                mock_client, "nb-123",
+                mock_client,
+                "nb-123",
                 goal="custom",
                 custom_prompt=long_prompt,
             )

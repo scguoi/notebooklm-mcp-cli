@@ -2,8 +2,9 @@
 
 from typing import Any
 
+from ...services import ServiceError
+from ...services import downloads as downloads_service
 from ._utils import get_client, logged_tool
-from ...services import downloads as downloads_service, ServiceError
 
 
 @logged_tool()
@@ -49,7 +50,9 @@ async def download_artifact(
     try:
         client = get_client()
         result = await downloads_service.download_async(
-            client, notebook_id, artifact_type,
+            client,
+            notebook_id,
+            artifact_type,
             output_path,
             artifact_id=artifact_id,
             output_format=output_format,

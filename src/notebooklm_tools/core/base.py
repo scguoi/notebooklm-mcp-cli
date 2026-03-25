@@ -19,14 +19,14 @@ from typing import Any
 import httpx
 
 from . import constants
-from .retry import is_retryable_error, DEFAULT_MAX_RETRIES, DEFAULT_BASE_DELAY, DEFAULT_MAX_DELAY
 from .data_types import ConversationTurn
 from .errors import ClientAuthenticationError as AuthenticationError
 from .errors import RPCError
+from .retry import DEFAULT_BASE_DELAY, DEFAULT_MAX_DELAY, DEFAULT_MAX_RETRIES, is_retryable_error
 from .utils import (
     RPC_NAMES,
-    _format_debug_json,
     _decode_request_body,
+    _format_debug_json,
     _parse_url_params,
 )
 
@@ -41,13 +41,13 @@ SOURCE_ADD_TIMEOUT = 120.0  # Extended timeout for all source operations
 
 class BaseClient:
     """Base client providing HTTP/RPC infrastructure for NotebookLM API.
-    
+
     This class handles:
     - Authentication (cookies, CSRF tokens, session management)
     - HTTP client lifecycle
     - RPC request/response protocol (batchexecute)
     - Automatic authentication recovery
-    
+
     Domain-specific operations are provided by mixin classes that inherit
     from this base class.
     """
@@ -60,14 +60,14 @@ class BaseClient:
     # =========================================================================
     # Known RPC IDs
     # =========================================================================
-    
+
     # Notebook operations
     RPC_LIST_NOTEBOOKS = "wXbhsf"
     RPC_GET_NOTEBOOK = "rLM1Ne"
     RPC_CREATE_NOTEBOOK = "CCqFvf"
     RPC_RENAME_NOTEBOOK = "s0tc2d"
     RPC_DELETE_NOTEBOOK = "WWINqb"
-    
+
     # Source operations
     RPC_ADD_SOURCE = "izAoDd"  # Used for URL, text, and Drive sources
     RPC_ADD_SOURCE_FILE = "o4cbdc"  # Register file for resumable upload
@@ -76,7 +76,7 @@ class BaseClient:
     RPC_SYNC_DRIVE = "FLmJqe"  # Sync Drive source with latest content
     RPC_DELETE_SOURCE = "tGMBJ"  # Delete a source from notebook
     RPC_RENAME_SOURCE = "b7Wfje"  # Rename a source
-    
+
     # Misc
     RPC_GET_CONVERSATIONS = "hPTbtc"
     RPC_DELETE_CHAT_HISTORY = "J7Gthc"
@@ -88,41 +88,41 @@ class BaseClient:
 
     # Research RPCs (source discovery)
     RPC_START_FAST_RESEARCH = "Ljjv0c"  # Start Fast Research (Web or Drive)
-    RPC_START_DEEP_RESEARCH = "QA9ei"   # Start Deep Research (Web only)
-    RPC_POLL_RESEARCH = "e3bVqc"        # Poll research results
-    RPC_IMPORT_RESEARCH = "LBwxtb"      # Import research sources
+    RPC_START_DEEP_RESEARCH = "QA9ei"  # Start Deep Research (Web only)
+    RPC_POLL_RESEARCH = "e3bVqc"  # Poll research results
+    RPC_IMPORT_RESEARCH = "LBwxtb"  # Import research sources
 
     # Studio content RPCs
-    RPC_CREATE_STUDIO = "R7cb6c"   # Create Audio or Video Overview
-    RPC_POLL_STUDIO = "gArtLc"     # Poll for studio content status
-    RPC_DELETE_STUDIO = "V5N4be"   # Delete Audio or Video Overview
-    RPC_RENAME_ARTIFACT = "rc3d8d" # Rename any studio artifact (Audio, Video, etc.)
+    RPC_CREATE_STUDIO = "R7cb6c"  # Create Audio or Video Overview
+    RPC_POLL_STUDIO = "gArtLc"  # Poll for studio content status
+    RPC_DELETE_STUDIO = "V5N4be"  # Delete Audio or Video Overview
+    RPC_RENAME_ARTIFACT = "rc3d8d"  # Rename any studio artifact (Audio, Video, etc.)
     RPC_GET_INTERACTIVE_HTML = "v9rmvd"  # Fetch quiz/flashcard HTML content
     RPC_REVISE_SLIDE_DECK = "KmcKPe"  # Revise existing slide deck with per-slide instructions
 
     # Mind map RPCs
     RPC_GENERATE_MIND_MAP = "yyryJe"  # Generate mind map JSON from sources
-    RPC_SAVE_MIND_MAP = "CYK0Xb"      # Save generated mind map to notebook
-    RPC_LIST_MIND_MAPS = "cFji9"       # List existing mind maps
-    RPC_DELETE_MIND_MAP = "AH0mwd"     # Delete a mind map
+    RPC_SAVE_MIND_MAP = "CYK0Xb"  # Save generated mind map to notebook
+    RPC_LIST_MIND_MAPS = "cFji9"  # List existing mind maps
+    RPC_DELETE_MIND_MAP = "AH0mwd"  # Delete a mind map
 
     # Notes RPCs (share RPC IDs with mind maps, differ by parameters)
-    RPC_CREATE_NOTE = "CYK0Xb"         # Create note from content (same as SAVE_MIND_MAP)
-    RPC_GET_NOTES = "cFji9"            # List notes and mind maps (same as LIST_MIND_MAPS)
-    RPC_UPDATE_NOTE = "cYAfTb"         # Update note content/title
-    RPC_DELETE_NOTE = "AH0mwd"         # Delete note permanently (same as DELETE_MIND_MAP)
+    RPC_CREATE_NOTE = "CYK0Xb"  # Create note from content (same as SAVE_MIND_MAP)
+    RPC_GET_NOTES = "cFji9"  # List notes and mind maps (same as LIST_MIND_MAPS)
+    RPC_UPDATE_NOTE = "cYAfTb"  # Update note content/title
+    RPC_DELETE_NOTE = "AH0mwd"  # Delete note permanently (same as DELETE_MIND_MAP)
 
     # Sharing RPCs
-    RPC_SHARE_NOTEBOOK = "QDyure"    # Set sharing settings (visibility, collaborators)
+    RPC_SHARE_NOTEBOOK = "QDyure"  # Set sharing settings (visibility, collaborators)
     RPC_GET_SHARE_STATUS = "JFMDGd"  # Get current share status
 
     # Export RPCs
-    RPC_EXPORT_ARTIFACT = "Krh3pd"   # Export to Google Docs/Sheets
+    RPC_EXPORT_ARTIFACT = "Krh3pd"  # Export to Google Docs/Sheets
 
     # =========================================================================
     # API Constants (re-exported from constants module)
     # =========================================================================
-    
+
     # Ownership
     OWNERSHIP_MINE = constants.OWNERSHIP_MINE
     OWNERSHIP_SHARED = constants.OWNERSHIP_SHARED
@@ -242,7 +242,13 @@ class BaseClient:
     # Lifecycle Methods
     # =========================================================================
 
-    def __init__(self, cookies: dict[str, str] | list[dict], csrf_token: str = "", session_id: str = "", build_label: str = ""):
+    def __init__(
+        self,
+        cookies: dict[str, str] | list[dict],
+        csrf_token: str = "",
+        session_id: str = "",
+        build_label: str = "",
+    ):
         """
         Initialize the base client.
 
@@ -322,7 +328,9 @@ class BaseClient:
         """Get Cookie header string (backward compatibility)."""
         if isinstance(self.cookies, list):
             # Flatten to simple dict for header
-            simple_cookies = {c["name"]: c["value"] for c in self.cookies if "name" in c and "value" in c}
+            simple_cookies = {
+                c["name"]: c["value"] for c in self.cookies if "name" in c and "value" in c
+            }
             return "; ".join(f"{k}={v}" for k, v in simple_cookies.items())
         else:
             return "; ".join(f"{k}={v}" for k, v in self.cookies.items())
@@ -348,13 +356,13 @@ class BaseClient:
                 },
                 timeout=30.0,
             )
-            
+
             # Explicitly set headers if needed, though constructor handles most
             if self.csrf_token:
                 self._client.headers["X-Goog-Csrf-Token"] = self.csrf_token
-                
+
         return self._client
-    
+
     def _get_async_client(self) -> httpx.AsyncClient:
         """Get an async client for streaming operations."""
         cookies = self._get_httpx_cookies()
@@ -381,10 +389,10 @@ class BaseClient:
         """Build the batchexecute request body."""
         # The params need to be JSON-encoded, then wrapped in the RPC structure
         # Use separators to match Chrome's compact format (no spaces)
-        params_json = json.dumps(params, separators=(',', ':'))
+        params_json = json.dumps(params, separators=(",", ":"))
 
         f_req = [[[rpc_id, params_json, None, "generic"]]]
-        f_req_json = json.dumps(f_req, separators=(',', ':'))
+        f_req_json = json.dumps(f_req, separators=(",", ":"))
 
         # URL encode (safe='' encodes all characters including /)
         body_parts = [f"f.req={urllib.parse.quote(f_req_json, safe='')}"]
@@ -468,7 +476,7 @@ class BaseClient:
         for chunk in parsed_response:
             if isinstance(chunk, list):
                 for item in chunk:
-                    if isinstance(item, list) and len(item) >= 3:
+                    if isinstance(item, list) and len(item) >= 3:  # noqa: SIM102
                         if item[0] == "wrb.fr" and item[1] == rpc_id:
                             # Check for structured error in item[5]
                             if len(item) > 5 and isinstance(item[5], list) and item[5]:
@@ -477,7 +485,9 @@ class BaseClient:
                                 if error_code is not None:
                                     # Auth error (code 16) — existing behavior
                                     if error_code == 16:
-                                        raise AuthenticationError("RPC Error 16: Authentication expired")
+                                        raise AuthenticationError(
+                                            "RPC Error 16: Authentication expired"
+                                        )
 
                                     # All other error codes — extract detail type
                                     detail_type = ""
@@ -485,7 +495,9 @@ class BaseClient:
                                     if len(item[5]) > 2 and isinstance(item[5][2], list):
                                         for detail in item[5][2]:
                                             if isinstance(detail, list) and len(detail) > 0:
-                                                detail_type = detail[0] if isinstance(detail[0], str) else ""
+                                                detail_type = (
+                                                    detail[0] if isinstance(detail[0], str) else ""
+                                                )
                                                 detail_data = detail[1] if len(detail) > 1 else None
                                                 break
 
@@ -560,8 +572,10 @@ class BaseClient:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug("-" * 70)
                 logger.debug(f"Response Status: {response.status_code}")
-                logger.debug("Raw response (first 2000 chars): %s",
-                             response.text[:2000] if response.text else "(empty)")
+                logger.debug(
+                    "Raw response (first 2000 chars): %s",
+                    response.text[:2000] if response.text else "(empty)",
+                )
                 logger.debug("=" * 70)
 
             response.raise_for_status()
@@ -576,24 +590,30 @@ class BaseClient:
                 logger.debug("Response Data:")
                 logger.debug(_format_debug_json(result))
                 logger.debug("=" * 70)
-            
+
             return result
 
         except httpx.HTTPStatusError as e:
             # Retry on transient server errors (5xx, 429) with exponential backoff
             if is_retryable_error(e):
                 import time as _time
+
                 status = e.response.status_code
                 # Use _server_retry to track retries across recursive calls
                 if _server_retry < DEFAULT_MAX_RETRIES:
-                    delay = min(DEFAULT_BASE_DELAY * (2 ** _server_retry), DEFAULT_MAX_DELAY)
+                    delay = min(DEFAULT_BASE_DELAY * (2**_server_retry), DEFAULT_MAX_DELAY)
                     logger.warning(
                         f"Server error {status} on attempt {_server_retry + 1}/{DEFAULT_MAX_RETRIES + 1}, "
                         f"retrying in {delay:.1f}s..."
                     )
                     _time.sleep(delay)
                     return self._call_rpc(
-                        rpc_id, params, path, timeout, _retry, _deep_retry,
+                        rpc_id,
+                        params,
+                        path,
+                        timeout,
+                        _retry,
+                        _deep_retry,
                         _server_retry=_server_retry + 1,
                     )
                 # Exhausted retries, re-raise
@@ -604,7 +624,7 @@ class BaseClient:
             if not is_http_auth:
                 # Not a retryable or auth error, re-raise immediately
                 raise
-            
+
             # Fall through to auth recovery below
             pass
 
@@ -623,13 +643,12 @@ class BaseClient:
             except ValueError:
                 # CSRF refresh failed (cookies expired) - continue to layer 2
                 pass
-        
+
         # Layer 2 & 3: Reload from disk or run headless auth (deep retry)
-        if not _deep_retry:
-            if self._try_reload_or_headless_auth():
-                self._client = None
-                return self._call_rpc(rpc_id, params, path, timeout, _retry=True, _deep_retry=True)
-        
+        if not _deep_retry and self._try_reload_or_headless_auth():
+            self._client = None
+            return self._call_rpc(rpc_id, params, path, timeout, _retry=True, _deep_retry=True)
+
         # All recovery attempts failed
         raise AuthenticationError(
             "Authentication expired. Run 'nlm login' in your terminal to re-authenticate."
@@ -656,7 +675,9 @@ class BaseClient:
         headers = self._PAGE_FETCH_HEADERS.copy()
 
         # Use a temporary client for the page fetch
-        with httpx.Client(cookies=cookies, headers=headers, follow_redirects=True, timeout=15.0) as client:
+        with httpx.Client(
+            cookies=cookies, headers=headers, follow_redirects=True, timeout=15.0
+        ) as client:
             response = client.get(f"{self.BASE_URL}/")
 
             # Check if redirected to login (cookies expired)
@@ -673,10 +694,12 @@ class BaseClient:
             # Extract CSRF token — try multiple known key names in case Google changes
             # the primary key (SNlM0e). Falls back to 'at=' and 'FdrFJe' patterns.
             from .auth import extract_csrf_from_page_source
+
             csrf_token = extract_csrf_from_page_source(html)
             if not csrf_token:
                 # Save HTML for debugging
                 from notebooklm_tools.utils.config import get_storage_dir
+
                 debug_dir = get_storage_dir()
                 debug_dir.mkdir(parents=True, exist_ok=True)
                 debug_path = debug_dir / "debug_page.html"
@@ -710,7 +733,8 @@ class BaseClient:
         """
         try:
             import time
-            from .auth import AuthTokens, save_tokens_to_cache, load_cached_tokens
+
+            from .auth import AuthTokens, load_cached_tokens, save_tokens_to_cache
 
             # Load existing cache or create new
             cached = load_cached_tokens()
@@ -737,11 +761,11 @@ class BaseClient:
 
     def _try_reload_or_headless_auth(self) -> bool:
         """Try to recover authentication by reloading from disk or running headless auth.
-        
+
         Returns True if new valid tokens were obtained, False otherwise.
         """
-        from .auth import load_cached_tokens, get_cache_path
-        
+        from .auth import get_cache_path, load_cached_tokens
+
         # Check if auth.json has tokens - always try them since current tokens failed
         cache_path = get_cache_path()
         if cache_path.exists():
@@ -754,10 +778,11 @@ class BaseClient:
                 self.csrf_token = ""  # Force re-extraction of CSRF token
                 self._session_id = ""  # Force re-extraction of session ID
                 return True
-        
+
         # Try headless auth if Chrome profile exists
         try:
             from notebooklm_tools.utils.cdp import run_headless_auth
+
             tokens = run_headless_auth()
             if tokens:
                 self.cookies = tokens.cookies

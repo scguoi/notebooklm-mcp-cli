@@ -3,13 +3,13 @@
 import re
 import shutil
 from pathlib import Path
-from typing import Literal, Optional
-
-from notebooklm_tools import __version__
+from typing import Any, Literal
 
 import typer
 from rich.console import Console
 from rich.table import Table
+
+from notebooklm_tools import __version__
 
 console = Console()
 app = typer.Typer(
@@ -76,9 +76,9 @@ TOOL_CONFIGS = {
 }
 
 
-def complete_tool_name(ctx: "click.Context", param: "click.Parameter", incomplete: str) -> list[str]:
+def complete_tool_name(ctx: Any, param: Any, incomplete: str) -> list[str]:
     """Shell completion callback for tool names."""
-    return [name for name in TOOL_CONFIGS.keys() if name.startswith(incomplete)]
+    return [name for name in TOOL_CONFIGS if name.startswith(incomplete)]
 
 
 def get_data_dir() -> Path:
@@ -95,7 +95,7 @@ def get_data_dir() -> Path:
     return data_dir
 
 
-def check_install_status(tool: str, level: str = "user") -> tuple[bool, Optional[Path]]:
+def check_install_status(tool: str, level: str = "user") -> tuple[bool, Path | None]:
     """Check if skill is installed for a tool.
 
     Returns:
@@ -142,15 +142,15 @@ def _inject_version_to_frontmatter(skill_path: Path) -> None:
         # Remove any existing version line
         frontmatter = re.sub(r"\nversion:.*", "", frontmatter)
         # Add version before closing ---
-        frontmatter = frontmatter.rstrip() + f"\nversion: \"{__version__}\"\n"
-        content = "---" + frontmatter + "---" + content[end_idx + 3:]
+        frontmatter = frontmatter.rstrip() + f'\nversion: "{__version__}"\n'
+        content = "---" + frontmatter + "---" + content[end_idx + 3 :]
     else:
         # No frontmatter — prepend one with version
-        content = f"---\nversion: \"{__version__}\"\n---\n\n" + content
+        content = f'---\nversion: "{__version__}"\n---\n\n' + content
     skill_path.write_text(content, encoding="utf-8")
 
 
-def _get_installed_version(tool: str, level: str) -> Optional[str]:
+def _get_installed_version(tool: str, level: str) -> str | None:
     """Read the version from an installed skill. Returns None if not found."""
     config = TOOL_CONFIGS[tool]
     install_path = config.get(level)
@@ -164,7 +164,7 @@ def _get_installed_version(tool: str, level: str) -> Optional[str]:
             return None
         try:
             content = install_path.read_text(encoding="utf-8")
-            match = re.search(r'<!-- nlm-version: ([\d.]+) -->', content)
+            match = re.search(r"<!-- nlm-version: ([\d.]+) -->", content)
             return match.group(1) if match else None
         except Exception:
             return None
@@ -193,7 +193,7 @@ def _inject_version_to_agents_md(agents_path: Path) -> None:
         version_comment = f"<!-- nlm-version: {__version__} -->"
 
         # Remove any existing version comment
-        content = re.sub(r'<!-- nlm-version: [\d.]+ -->\n?', '', content)
+        content = re.sub(r"<!-- nlm-version: [\d.]+ -->\n?", "", content)
 
         # Insert version comment right after the start marker
         start_marker = "<!-- nlm-skill-start -->"
@@ -205,7 +205,6 @@ def _inject_version_to_agents_md(agents_path: Path) -> None:
             agents_path.write_text(content, encoding="utf-8")
     except Exception:
         pass
-
 
 
 def install_skill_md(install_path: Path) -> None:
@@ -231,10 +230,10 @@ def install_skill_md(install_path: Path) -> None:
     shutil.copytree(ref_src, ref_dst)
 
     console.print(f"[green]✓[/green] Installed SKILL.md (v{__version__}) to {install_path}")
-    console.print(f"  [dim]• SKILL.md")
-    console.print(f"  [dim]• references/command_reference.md")
-    console.print(f"  [dim]• references/troubleshooting.md")
-    console.print(f"  [dim]• references/workflows.md")
+    console.print("  [dim]• SKILL.md")
+    console.print("  [dim]• references/command_reference.md")
+    console.print("  [dim]• references/troubleshooting.md")
+    console.print("  [dim]• references/workflows.md")
 
 
 def install_agents_md(install_path: Path) -> None:
@@ -259,7 +258,7 @@ def install_agents_md(install_path: Path) -> None:
             if start_idx != -1 and end_idx != -1:
                 # Replace existing section
                 before = content[:start_idx]
-                after = content[end_idx + len(end_marker):]
+                after = content[end_idx + len(end_marker) :]
                 content = before + section_content + after
             else:
                 # Malformed markers, append anyway
@@ -278,7 +277,7 @@ def install_agents_md(install_path: Path) -> None:
     _inject_version_to_agents_md(install_path)
 
     console.print(f"[green]✓[/green] Updated AGENTS.md at {install_path}")
-    console.print(f"  [dim]• NLM section appended with markers")
+    console.print("  [dim]• NLM section appended with markers")
 
 
 def install_all_formats(install_path: Path) -> None:
@@ -362,9 +361,11 @@ Where `<tool>` is: claude-code, cursor, agents, opencode, antigravity, cline, op
     (install_path / "README.md").write_text(readme_content, encoding="utf-8")
 
     console.print(f"[green]✓[/green] Exported all formats to {install_path}")
-    console.print(f"  [dim]• nlm-skill/ (skill directory for Claude Code, OpenCode, Agents, Antigravity)")
-    console.print(f"  [dim]• AGENTS_SECTION.md (for Codex)")
-    console.print(f"  [dim]• README.md (installation instructions)")
+    console.print(
+        "  [dim]• nlm-skill/ (skill directory for Claude Code, OpenCode, Agents, Antigravity)"
+    )
+    console.print("  [dim]• AGENTS_SECTION.md (for Codex)")
+    console.print("  [dim]• README.md (installation instructions)")
 
 
 @app.command("install")
@@ -404,8 +405,10 @@ def install(
             level = "project"
             console.print("[dim]Note: 'other' exports to current directory (project level)[/dim]")
         else:
-            console.print(f"[red]Error:[/red] Tool '{tool}' does not support user-level installation")
-            console.print(f"Use --level project instead")
+            console.print(
+                f"[red]Error:[/red] Tool '{tool}' does not support user-level installation"
+            )
+            console.print("Use --level project instead")
             raise typer.Exit(1)
 
     # Get install path
@@ -417,22 +420,22 @@ def install(
     if level == "user" and install_path:
         # For SKILL.md format, check the parent of the skill directory
         # For AGENTS.md format, check the parent of the file
-        if config["format"] == "skill.md":
-            parent_dir = install_path.parent
-        elif config["format"] == "agents.md":
+        if config["format"] == "skill.md" or config["format"] == "agents.md":
             parent_dir = install_path.parent
         else:
             parent_dir = None
 
         if parent_dir and not parent_dir.exists():
-            console.print(f"[yellow]Warning:[/yellow] Parent directory does not exist: {parent_dir}")
+            console.print(
+                f"[yellow]Warning:[/yellow] Parent directory does not exist: {parent_dir}"
+            )
             console.print(f"This suggests {tool} may not be installed on your system.")
             console.print()
 
             # Offer options
             console.print("Options:")
-            console.print(f"  1. Create the directory and install anyway")
-            console.print(f"  2. Use --level project to install in current directory")
+            console.print("  1. Create the directory and install anyway")
+            console.print("  2. Use --level project to install in current directory")
             console.print(f"  3. Cancel and install {tool} first")
             console.print()
 
@@ -446,11 +449,13 @@ def install(
                 console.print(f"[dim]Creating {parent_dir}...[/dim]")
                 parent_dir.mkdir(parents=True, exist_ok=True)
             elif choice == 2:
-                console.print(f"[dim]Switching to project-level installation...[/dim]")
+                console.print("[dim]Switching to project-level installation...[/dim]")
                 level = "project"
                 install_path = config.get("project")
                 if not install_path:
-                    console.print(f"[red]Error:[/red] Tool '{tool}' does not support project-level installation")
+                    console.print(
+                        f"[red]Error:[/red] Tool '{tool}' does not support project-level installation"
+                    )
                     raise typer.Exit(1)
             else:
                 console.print("Cancelled.")
@@ -481,7 +486,7 @@ def install(
 
     except Exception as e:
         console.print(f"\n[red]✗ Installation failed:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("uninstall")
@@ -545,7 +550,7 @@ def uninstall(
                 if start_idx != -1 and end_idx != -1:
                     # Remove section
                     before = content[:start_idx].rstrip()
-                    after = content[end_idx + len(end_marker):].lstrip()
+                    after = content[end_idx + len(end_marker) :].lstrip()
 
                     if before and after:
                         content = before + "\n\n" + after
@@ -569,7 +574,7 @@ def uninstall(
 
     except Exception as e:
         console.print(f"\n[red]✗ Uninstall failed:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("list")
@@ -638,7 +643,9 @@ def list_tools() -> None:
     console.print(table)
     console.print("\n[dim]Legend: ✓ = installed, - = not installed, N/A = not applicable[/dim]")
     if has_outdated:
-        console.print(f"[yellow]⚠  Some skills are outdated (current: v{__version__}). Run 'nlm skill update' to update all.[/yellow]")
+        console.print(
+            f"[yellow]⚠  Some skills are outdated (current: v{__version__}). Run 'nlm skill update' to update all.[/yellow]"
+        )
 
 
 def _update_single_tool(tool: str, level: str) -> bool:
@@ -665,7 +672,7 @@ def _update_single_tool(tool: str, level: str) -> bool:
 
 @app.command("update")
 def update(
-    tool: Optional[str] = typer.Argument(
+    tool: str | None = typer.Argument(
         None,
         help="Tool to update (omit to update all outdated skills)",
         shell_complete=complete_tool_name,
@@ -725,7 +732,9 @@ def update(
         console.print(f"[red]✗ {skipped} skill(s) failed to update[/red]")
     else:
         if tool:
-            console.print(f"[dim]{tool} is not installed. Use 'nlm skill install {tool}' first.[/dim]")
+            console.print(
+                f"[dim]{tool} is not installed. Use 'nlm skill install {tool}' first.[/dim]"
+            )
         else:
             console.print("[dim]No installed skills found to update.[/dim]")
 
@@ -739,7 +748,7 @@ def show() -> None:
     skill_file = data_dir / "SKILL.md"
 
     if not skill_file.exists():
-        console.print(f"[red]Error:[/red] SKILL.md not found")
+        console.print("[red]Error:[/red] SKILL.md not found")
         raise typer.Exit(1)
 
     content = skill_file.read_text(encoding="utf-8")

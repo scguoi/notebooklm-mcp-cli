@@ -1,9 +1,8 @@
 """Tests for MCP file upload functionality via consolidated source_add."""
+
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 class TestMCPSourceAddFile:
@@ -14,12 +13,11 @@ class TestMCPSourceAddFile:
         from notebooklm_tools.mcp.tools import sources
 
         # Check if source_add exists and supports file type
-        assert hasattr(sources, 'source_add')
+        assert hasattr(sources, "source_add")
 
     def test_source_add_file_calls_client(self):
         """Test that source_add file type calls client.add_file correctly."""
-        from notebooklm_tools.mcp.tools import sources
-        from notebooklm_tools.mcp.tools import _utils
+        from notebooklm_tools.mcp.tools import _utils, sources
 
         # Create a test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
@@ -29,18 +27,13 @@ class TestMCPSourceAddFile:
         try:
             # Mock the client
             mock_client = MagicMock()
-            mock_client.add_file.return_value = {
-                "id": "test-source-id",
-                "title": "test.txt"
-            }
+            mock_client.add_file.return_value = {"id": "test-source-id", "title": "test.txt"}
 
             # Reset and patch get_client in sources module where it's imported
             _utils.reset_client()
-            with patch('notebooklm_tools.mcp.tools.sources.get_client', return_value=mock_client):
+            with patch("notebooklm_tools.mcp.tools.sources.get_client", return_value=mock_client):
                 result = sources.source_add(
-                    notebook_id="test-notebook-123",
-                    source_type="file",
-                    file_path=temp_path
+                    notebook_id="test-notebook-123", source_type="file", file_path=temp_path
                 )
 
             # Verify client.add_file was called with correct args
@@ -61,7 +54,7 @@ class TestMCPSourceAddFile:
 
         result = sources.source_add(
             notebook_id="test-notebook",
-            source_type="file"
+            source_type="file",
             # Missing file_path
         )
 

@@ -408,7 +408,7 @@ class TestBrowserErrorMessages:
         from notebooklm_tools.core.exceptions import AuthenticationError
         from notebooklm_tools.utils.cdp import extract_cookies_via_cdp
 
-        with (
+        with (  # noqa: SIM117
             patch("notebooklm_tools.utils.cdp.platform.system", return_value="Darwin"),
             patch("notebooklm_tools.utils.cdp.get_chrome_path", return_value=None),
             patch("notebooklm_tools.utils.cdp.find_existing_nlm_chrome", return_value=(None, None)),
@@ -426,7 +426,7 @@ class TestBrowserErrorMessages:
         from notebooklm_tools.core.exceptions import AuthenticationError
         from notebooklm_tools.utils.cdp import extract_cookies_via_cdp
 
-        with (
+        with (  # noqa: SIM117
             patch("notebooklm_tools.utils.cdp.platform.system", return_value="Linux"),
             patch("notebooklm_tools.utils.cdp.get_chrome_path", return_value=None),
             patch("notebooklm_tools.utils.cdp.find_existing_nlm_chrome", return_value=(None, None)),
@@ -445,7 +445,7 @@ class TestBrowserErrorMessages:
         from notebooklm_tools.core.exceptions import AuthenticationError
         from notebooklm_tools.utils.cdp import extract_cookies_via_cdp
 
-        with (
+        with (  # noqa: SIM117
             patch("notebooklm_tools.utils.cdp.platform.system", return_value="Windows"),
             patch("notebooklm_tools.utils.cdp.get_chrome_path", return_value=None),
             patch("notebooklm_tools.utils.cdp.find_existing_nlm_chrome", return_value=(None, None)),
@@ -464,7 +464,7 @@ class TestBrowserErrorMessages:
         from notebooklm_tools.core.exceptions import AuthenticationError
         from notebooklm_tools.utils.cdp import extract_cookies_via_cdp
 
-        with (
+        with (  # noqa: SIM117
             patch("notebooklm_tools.utils.cdp.get_chrome_path", return_value=None),
             patch("notebooklm_tools.utils.cdp.find_existing_nlm_chrome", return_value=(None, None)),
             patch("notebooklm_tools.utils.cdp.is_profile_locked", return_value=False),
@@ -478,7 +478,7 @@ class TestBrowserErrorMessages:
         from notebooklm_tools.core.exceptions import AuthenticationError
         from notebooklm_tools.utils.cdp import extract_cookies_via_cdp
 
-        with (
+        with (  # noqa: SIM117
             patch("notebooklm_tools.utils.cdp.get_chrome_path", return_value=None),
             patch("notebooklm_tools.utils.cdp.find_existing_nlm_chrome", return_value=(None, None)),
             patch("notebooklm_tools.utils.cdp.is_profile_locked", return_value=False),
@@ -493,7 +493,7 @@ class TestBrowserErrorMessages:
         from notebooklm_tools.core.exceptions import AuthenticationError
         from notebooklm_tools.utils.cdp import extract_cookies_via_cdp
 
-        with (
+        with (  # noqa: SIM117
             patch("notebooklm_tools.utils.cdp.get_chrome_path", return_value="/some/browser"),
             patch("notebooklm_tools.utils.cdp.find_existing_nlm_chrome", return_value=(None, None)),
             patch("notebooklm_tools.utils.cdp.is_profile_locked", return_value=False),
@@ -510,7 +510,7 @@ class TestBrowserErrorMessages:
         from notebooklm_tools.core.exceptions import AuthenticationError
         from notebooklm_tools.utils.cdp import extract_cookies_via_cdp
 
-        with (
+        with (  # noqa: SIM117
             patch("notebooklm_tools.utils.cdp.get_chrome_path", return_value="/some/browser"),
             patch("notebooklm_tools.utils.cdp.find_existing_nlm_chrome", return_value=(None, None)),
             patch("notebooklm_tools.utils.cdp.is_profile_locked", return_value=False),
@@ -530,7 +530,6 @@ class TestMCPServerImports:
     def test_mcp_server_imports(self):
         """MCP server should import without errors."""
         # This will fail if any imports are broken
-        import notebooklm_tools.mcp.server
 
     def test_mcp_tools_import(self):
         """MCP tools should import without errors."""
@@ -538,8 +537,6 @@ class TestMCPServerImports:
 
         assert callable(refresh_auth)
         assert callable(save_auth_tokens)
-
-
 
 
 class TestPageFetchHeaders:
@@ -554,6 +551,7 @@ class TestPageFetchHeaders:
 
     def _get_headers(self):
         from notebooklm_tools.core.base import BaseClient
+
         return BaseClient._PAGE_FETCH_HEADERS
 
     def test_no_sec_ch_ua_platform(self):
@@ -591,4 +589,3 @@ class TestPageFetchHeaders:
     def test_user_agent_is_present(self):
         """User-Agent header must still be present."""
         assert "User-Agent" in self._get_headers()
-

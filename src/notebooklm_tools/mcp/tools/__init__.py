@@ -1,55 +1,55 @@
 """MCP Tools - Modular tool definitions for NotebookLM MCP Server."""
 
 # Import all tools from submodules for registration
-from .downloads import download_artifact
 from .auth import refresh_auth, save_auth_tokens
-from .notebooks import (
-    notebook_list,
-    notebook_get,
-    notebook_describe,
-    notebook_create,
-    notebook_rename,
-    notebook_delete,
-)
-from .sources import (
-    source_add,
-    source_list_drive,
-    source_sync_drive,
-    source_delete,
-    source_describe,
-    source_get_content,
-    source_rename,
-)
-from .sharing import (
-    notebook_share_status,
-    notebook_share_public,
-    notebook_share_invite,
-    notebook_share_batch,
-)
-from .research import (
-    research_start,
-    research_status,
-    research_import,
-)
-from .studio import (
-    studio_create,
-    studio_status,
-    studio_delete,
-    studio_revise,
-)
+from .batch import batch
 from .chat import (
-    notebook_query,
     chat_configure,
+    notebook_query,
 )
+from .cross_notebook import cross_notebook_query
+from .downloads import download_artifact
 from .exports import (
     export_artifact,
 )
+from .notebooks import (
+    notebook_create,
+    notebook_delete,
+    notebook_describe,
+    notebook_get,
+    notebook_list,
+    notebook_rename,
+)
 from .notes import note
-from .server import server_info
-from .batch import batch
-from .cross_notebook import cross_notebook_query
 from .pipeline import pipeline
+from .research import (
+    research_import,
+    research_start,
+    research_status,
+)
+from .server import server_info
+from .sharing import (
+    notebook_share_batch,
+    notebook_share_invite,
+    notebook_share_public,
+    notebook_share_status,
+)
 from .smart_select import tag
+from .sources import (
+    source_add,
+    source_delete,
+    source_describe,
+    source_get_content,
+    source_list_drive,
+    source_rename,
+    source_sync_drive,
+)
+from .studio import (
+    studio_create,
+    studio_delete,
+    studio_revise,
+    studio_status,
+)
 
 __all__ = [
     # Downloads (1 consolidated)

@@ -1,16 +1,15 @@
 """Studio CLI commands for generation (audio, report, quiz, etc.)."""
 
-from typing import Optional
-
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from notebooklm_tools.core.alias import get_alias_manager
-from notebooklm_tools.core.exceptions import NLMError
 from notebooklm_tools.cli.formatters import detect_output_format, get_formatter
 from notebooklm_tools.cli.utils import get_client, handle_error
-from notebooklm_tools.services import studio as studio_service, ServiceError, ValidationError
+from notebooklm_tools.core.alias import get_alias_manager
+from notebooklm_tools.core.exceptions import NLMError
+from notebooklm_tools.services import ServiceError, ValidationError
+from notebooklm_tools.services import studio as studio_service
 from notebooklm_tools.utils.config import get_default_language
 
 console = Console()
@@ -81,7 +80,7 @@ def _run_create(
     notebook_id: str,
     artifact_type: str,
     label: str,
-    profile: Optional[str],
+    profile: str | None,
     **kwargs,
 ) -> None:
     """Shared CLI creation logic: spinner + service call + formatted output.
@@ -102,12 +101,15 @@ def _run_create(
             progress.add_task(f"Creating {label}...", total=None)
             with get_client(profile) as client:
                 result = studio_service.create_artifact(
-                    client, notebook_id, artifact_type, **kwargs,
+                    client,
+                    notebook_id,
+                    artifact_type,
+                    **kwargs,
                 )
 
         # Mind map has a different result shape
         if artifact_type == "mind_map":
-            console.print(f"[green]✓[/green] Mind map created")
+            console.print("[green]✓[/green] Mind map created")
             console.print(f"  ID: {result.get('artifact_id', 'unknown')}")
             console.print(f"  Title: {result.get('title', 'Mind Map')}")
         else:
@@ -119,19 +121,20 @@ def _run_create(
         console.print(f"[red]Error:[/red] {msg}")
         if isinstance(e, ServiceError) and "rejected" in str(e):
             console.print("[dim]Try again later or create from NotebookLM UI for diagnosis.[/dim]")
-        raise typer.Exit(1)
-    except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        raise typer.Exit(1) from e
+    except NLMError as e:
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 # ========== Studio Status/Delete ==========
+
 
 @app.command("status")
 def studio_status(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     full: bool = typer.Option(False, "--full", "-a", help="Show all details"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """List all studio artifacts and their status."""
     try:
@@ -143,7 +146,7 @@ def studio_status(
         formatter = get_formatter(fmt, console)
         formatter.format_artifacts(artifacts, full=full)
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("delete")
@@ -151,7 +154,7 @@ def studio_delete(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     artifact_id: str = typer.Argument(..., help="Artifact ID to delete"),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Delete a studio artifact permanently."""
     notebook_id = get_alias_manager().resolve(notebook_id)
@@ -165,14 +168,14 @@ def studio_delete(
             studio_service.delete_artifact(client, artifact_id, notebook_id)
         console.print(f"[green]✓[/green] Deleted artifact: {artifact_id}")
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 @app.command("rename")
 def studio_rename(
     artifact_id: str = typer.Argument(..., help="Artifact ID to rename"),
     new_title: str = typer.Argument(..., help="New title for the artifact"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Rename a studio artifact."""
     artifact_id = get_alias_manager().resolve(artifact_id)
@@ -184,66 +187,88 @@ def studio_rename(
     except (ValidationError, ServiceError) as e:
         msg = e.user_message if isinstance(e, ServiceError) else str(e)
         console.print(f"[red]Error:[/red] {msg}")
-        raise typer.Exit(1)
-    except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        raise typer.Exit(1) from e
+    except NLMError as e:
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 # ========== Audio ==========
+
 
 @audio_app.command("create")
 def create_audio(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     format: str = typer.Option(
-        "deep_dive", "--format", "-f",
+        "deep_dive",
+        "--format",
+        "-f",
         help="Overview format (deep_dive, brief, critique, debate)",
     ),
     length: str = typer.Option(
-        "default", "--length", "-l",
+        "default",
+        "--length",
+        "-l",
         help="Length (short, default, long)",
     ),
     language: str = typer.Option(
-        "", "--language",
+        "",
+        "--language",
         help="BCP-47 language code (default: NOTEBOOKLM_HL or en)",
     ),
-    focus: Optional[str] = typer.Option(
-        None, "--focus",
+    focus: str | None = typer.Option(
+        None,
+        "--focus",
         help="Optional focus topic",
     ),
-    source_ids: Optional[str] = typer.Option(
-        None, "--source-ids", "-s",
+    source_ids: str | None = typer.Option(
+        None,
+        "--source-ids",
+        "-s",
         help="Comma-separated source IDs",
     ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create an audio overview (podcast) from notebook sources."""
     if not confirm:
         typer.confirm(f"Create {format} audio overview?", abort=True)
 
     _run_create(
-        notebook_id, "audio", "audio",
+        notebook_id,
+        "audio",
+        "audio",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
-        audio_format=format, audio_length=length,
-        language=language, focus_prompt=focus or "",
+        audio_format=format,
+        audio_length=length,
+        language=language,
+        focus_prompt=focus or "",
     )
 
 
 # ========== Report ==========
 
+
 @report_app.command("create")
 def create_report(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     format: str = typer.Option(
-        "Briefing Doc", "--format", "-f",
+        "Briefing Doc",
+        "--format",
+        "-f",
         help="Format: 'Briefing Doc', 'Study Guide', 'Blog Post', 'Create Your Own'",
     ),
-    prompt: str = typer.Option("", "--prompt", help="Custom prompt (required for 'Create Your Own')"),
-    language: str = typer.Option("", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", "-s", help="Comma-separated source IDs"),
+    prompt: str = typer.Option(
+        "", "--prompt", help="Custom prompt (required for 'Create Your Own')"
+    ),
+    language: str = typer.Option(
+        "", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"
+    ),
+    source_ids: str | None = typer.Option(
+        None, "--source-ids", "-s", help="Comma-separated source IDs"
+    ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create a report from notebook sources."""
     if format == "Create Your Own" and not prompt:
@@ -254,25 +279,33 @@ def create_report(
         typer.confirm(f"Create '{format}' report?", abort=True)
 
     _run_create(
-        notebook_id, "report", "report",
+        notebook_id,
+        "report",
+        "report",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
-        report_format=format, custom_prompt=prompt,
+        report_format=format,
+        custom_prompt=prompt,
         language=language,
     )
 
 
 # ========== Quiz ==========
 
+
 @quiz_app.command("create")
 def create_quiz(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     count: int = typer.Option(2, "--count", "-c", help="Number of questions"),
     difficulty: int = typer.Option(2, "--difficulty", "-d", help="Difficulty 1-5 (1=easy, 5=hard)"),
-    focus: Optional[str] = typer.Option(None, "--focus", "-f", help="Focus prompt to guide generation"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", "-s", help="Comma-separated source IDs"),
+    focus: str | None = typer.Option(
+        None, "--focus", "-f", help="Focus prompt to guide generation"
+    ),
+    source_ids: str | None = typer.Option(
+        None, "--source-ids", "-s", help="Comma-separated source IDs"
+    ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create a quiz from notebook sources."""
     if not confirm:
@@ -297,34 +330,47 @@ def create_quiz(
                 )
 
         if not result or not result.get("artifact_id"):
-            console.print("[red]Error:[/red] NotebookLM rejected quiz creation (no artifact returned).")
+            console.print(
+                "[red]Error:[/red] NotebookLM rejected quiz creation (no artifact returned)."
+            )
             console.print("[dim]Try again later or create from NotebookLM UI for diagnosis.[/dim]")
             raise typer.Exit(1)
 
         console.print("[green]✓[/green] Quiz generation started")
         console.print(f"  Artifact ID: {result.get('artifact_id', 'unknown')}")
-        console.print(f"\n[dim]Run 'nlm studio status {notebook_id_resolved}' to check progress.[/dim]")
+        console.print(
+            f"\n[dim]Run 'nlm studio status {notebook_id_resolved}' to check progress.[/dim]"
+        )
     except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 # ========== Flashcards ==========
 
+
 @flashcards_app.command("create")
 def create_flashcards(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
-    difficulty: str = typer.Option("medium", "--difficulty", "-d", help="Difficulty: easy, medium, hard"),
-    focus: Optional[str] = typer.Option(None, "--focus", "-f", help="Focus prompt to guide generation"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", "-s", help="Comma-separated source IDs"),
+    difficulty: str = typer.Option(
+        "medium", "--difficulty", "-d", help="Difficulty: easy, medium, hard"
+    ),
+    focus: str | None = typer.Option(
+        None, "--focus", "-f", help="Focus prompt to guide generation"
+    ),
+    source_ids: str | None = typer.Option(
+        None, "--source-ids", "-s", help="Comma-separated source IDs"
+    ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create flashcards from notebook sources."""
     if not confirm:
         typer.confirm("Create flashcards?", abort=True)
 
     _run_create(
-        notebook_id, "flashcards", "flashcards",
+        notebook_id,
+        "flashcards",
+        "flashcards",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
         difficulty=difficulty,
@@ -334,20 +380,25 @@ def create_flashcards(
 
 # ========== Mind Map ==========
 
+
 @mindmap_app.command("create")
 def create_mindmap(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     title: str = typer.Option("Mind Map", "--title", "-t", help="Mind map title"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", "-s", help="Comma-separated source IDs"),
+    source_ids: str | None = typer.Option(
+        None, "--source-ids", "-s", help="Comma-separated source IDs"
+    ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create a mind map from notebook sources."""
     if not confirm:
         typer.confirm("Create mind map?", abort=True)
 
     _run_create(
-        notebook_id, "mind_map", "mind map",
+        notebook_id,
+        "mind_map",
+        "mind map",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
         title=title,
@@ -359,39 +410,51 @@ def create_mindmap(
 
 # ========== Slides ==========
 
+
 @slides_app.command("create")
 def create_slides(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
-    format: str = typer.Option("detailed_deck", "--format", "-f", help="Format: detailed_deck, presenter_slides"),
+    format: str = typer.Option(
+        "detailed_deck", "--format", "-f", help="Format: detailed_deck, presenter_slides"
+    ),
     length: str = typer.Option("default", "--length", "-l", help="Length: short, default"),
-    language: str = typer.Option("", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"),
+    language: str = typer.Option(
+        "", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"
+    ),
     focus: str = typer.Option("", "--focus", help="Optional focus topic"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", "-s", help="Comma-separated source IDs"),
+    source_ids: str | None = typer.Option(
+        None, "--source-ids", "-s", help="Comma-separated source IDs"
+    ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create a slide deck from notebook sources."""
     if not confirm:
         typer.confirm("Create slide deck?", abort=True)
 
     _run_create(
-        notebook_id, "slide_deck", "slide deck",
+        notebook_id,
+        "slide_deck",
+        "slide deck",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
-        slide_format=format, slide_length=length,
-        language=language, focus_prompt=focus,
+        slide_format=format,
+        slide_length=length,
+        language=language,
+        focus_prompt=focus,
     )
 
 
 @slides_app.command("revise")
 def revise_slides(
     artifact_id: str = typer.Argument(..., help="Artifact ID of the slide deck to revise"),
-    slide: list[str] = typer.Option(
-        ..., "--slide",
+    slide: list[str] = typer.Option(  # noqa: B008
+        ...,
+        "--slide",
         help='Slide revision in format: SLIDE_NUM "instruction" (e.g., --slide 1 "Make title larger")',
     ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Revise individual slides in an existing slide deck.
 
@@ -408,13 +471,17 @@ def revise_slides(
     for s in slide:
         parts = s.strip().split(None, 1)
         if len(parts) < 2:
-            console.print(f"[red]Error:[/red] Invalid --slide format: '{s}'. Expected: NUMBER \"instruction\"")
+            console.print(
+                f"[red]Error:[/red] Invalid --slide format: '{s}'. Expected: NUMBER \"instruction\""
+            )
             raise typer.Exit(1)
         try:
             slide_num = int(parts[0])
         except ValueError:
-            console.print(f"[red]Error:[/red] Invalid slide number: '{parts[0]}'. Must be an integer >= 1.")
-            raise typer.Exit(1)
+            console.print(
+                f"[red]Error:[/red] Invalid slide number: '{parts[0]}'. Must be an integer >= 1."
+            )
+            raise typer.Exit(1) from None
         instructions.append({"slide": slide_num, "instruction": parts[1]})
 
     if not confirm:
@@ -433,99 +500,134 @@ def revise_slides(
             progress.add_task("Revising slide deck...", total=None)
             with get_client(profile) as client:
                 result = studio_service.revise_artifact(
-                    client, artifact_id, instructions,
+                    client,
+                    artifact_id,
+                    instructions,
                 )
 
         console.print("[green]✓[/green] Slide deck revision started")
         console.print(f"  New Artifact ID: {result.get('artifact_id', 'unknown')}")
         console.print(f"  Original: {artifact_id}")
-        console.print(f"\n[dim]Run 'nlm studio status <notebook-id>' to check progress.[/dim]")
+        console.print("\n[dim]Run 'nlm studio status <notebook-id>' to check progress.[/dim]")
     except (ValidationError, ServiceError) as e:
         msg = e.user_message if isinstance(e, ServiceError) else str(e)
         console.print(f"[red]Error:[/red] {msg}")
-        raise typer.Exit(1)
-    except (ServiceError, NLMError) as e:
-        handle_error(e, json_output=locals().get('json_output', False))
+        raise typer.Exit(1) from e
+    except NLMError as e:
+        handle_error(e, json_output=locals().get("json_output", False))
 
 
 # ========== Infographic ==========
 
+
 @infographic_app.command("create")
 def create_infographic(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
-    orientation: str = typer.Option("landscape", "--orientation", "-o", help="Orientation: landscape, portrait, square"),
-    detail: str = typer.Option("standard", "--detail", "-d", help="Detail level: concise, standard, detailed"),
+    orientation: str = typer.Option(
+        "landscape", "--orientation", "-o", help="Orientation: landscape, portrait, square"
+    ),
+    detail: str = typer.Option(
+        "standard", "--detail", "-d", help="Detail level: concise, standard, detailed"
+    ),
     style: str = typer.Option(
-        "auto_select", "--style",
+        "auto_select",
+        "--style",
         help="Visual style: auto_select, sketch_note, professional, bento_grid, editorial, instructional, bricks, clay, anime, kawaii, scientific",
     ),
-    language: str = typer.Option("", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"),
+    language: str = typer.Option(
+        "", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"
+    ),
     focus: str = typer.Option("", "--focus", help="Optional focus topic"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", "-s", help="Comma-separated source IDs"),
+    source_ids: str | None = typer.Option(
+        None, "--source-ids", "-s", help="Comma-separated source IDs"
+    ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create an infographic from notebook sources."""
     if not confirm:
         typer.confirm("Create infographic?", abort=True)
 
     _run_create(
-        notebook_id, "infographic", "infographic",
+        notebook_id,
+        "infographic",
+        "infographic",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
-        orientation=orientation, detail_level=detail,
+        orientation=orientation,
+        detail_level=detail,
         infographic_style=style,
-        language=language, focus_prompt=focus,
+        language=language,
+        focus_prompt=focus,
     )
 
 
 # ========== Video ==========
 
+
 @video_app.command("create")
 def create_video(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
-    format: str = typer.Option("explainer", "--format", "-f", help="Format: explainer, brief, cinematic"),
+    format: str = typer.Option(
+        "explainer", "--format", "-f", help="Format: explainer, brief, cinematic"
+    ),
     style: str = typer.Option(
-        "auto_select", "--style", "-s",
+        "auto_select",
+        "--style",
+        "-s",
         help="Visual style: auto_select, classic, whiteboard, kawaii, anime, watercolor, retro_print, heritage, paper_craft",
     ),
-    language: str = typer.Option("", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"),
+    language: str = typer.Option(
+        "", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"
+    ),
     focus: str = typer.Option("", "--focus", help="Optional focus topic"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", help="Comma-separated source IDs"),
+    source_ids: str | None = typer.Option(None, "--source-ids", help="Comma-separated source IDs"),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create a video overview from notebook sources."""
     if not confirm:
         typer.confirm("Create video overview?", abort=True)
 
     _run_create(
-        notebook_id, "video", "video",
+        notebook_id,
+        "video",
+        "video",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
-        video_format=format, visual_style=style,
-        language=language, focus_prompt=focus,
+        video_format=format,
+        visual_style=style,
+        language=language,
+        focus_prompt=focus,
     )
 
 
 # ========== Data Table ==========
 
+
 @data_table_app.command("create")
 def create_data_table(
     notebook_id: str = typer.Argument(..., help="Notebook ID"),
     description: str = typer.Argument(..., help="Description of the data table to create"),
-    language: str = typer.Option("", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"),
-    source_ids: Optional[str] = typer.Option(None, "--source-ids", "-s", help="Comma-separated source IDs"),
+    language: str = typer.Option(
+        "", "--language", help="BCP-47 language code (default: NOTEBOOKLM_HL or en)"
+    ),
+    source_ids: str | None = typer.Option(
+        None, "--source-ids", "-s", help="Comma-separated source IDs"
+    ),
     confirm: bool = typer.Option(False, "--confirm", "-y", help="Skip confirmation"),
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ) -> None:
     """Create a data table from notebook sources."""
     if not confirm:
         typer.confirm("Create data table?", abort=True)
 
     _run_create(
-        notebook_id, "data_table", "data table",
+        notebook_id,
+        "data_table",
+        "data table",
         profile=profile,
         source_ids=parse_source_ids(source_ids),
-        description=description, language=language,
+        description=description,
+        language=language,
     )

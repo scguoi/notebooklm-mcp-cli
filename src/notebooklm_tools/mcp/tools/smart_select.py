@@ -60,7 +60,10 @@ def tag(
             return {"status": "success", **result}
 
         else:
-            return {"status": "error", "error": f"Unknown action: {action}. Use: add, remove, list, select"}
+            return {
+                "status": "error",
+                "error": f"Unknown action: {action}. Use: add, remove, list, select",
+            }
 
     except ServiceError as e:
         err = {"status": "error", "error": e.user_message}

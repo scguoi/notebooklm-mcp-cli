@@ -1,7 +1,8 @@
 """Tests for the `nlm source add` CLI command, focusing on --youtube bulk support."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from typer.testing import CliRunner
 
 from notebooklm_tools.cli.commands.source import app
@@ -26,7 +27,11 @@ def _patch_deps(mock_client, add_source_result=None, add_sources_result=None):
     alias_mgr = MagicMock()
     alias_mgr.resolve.side_effect = lambda x: x  # identity
 
-    single_result = add_source_result or {"source_type": "url", "source_id": "src-1", "title": "YouTube Video"}
+    single_result = add_source_result or {
+        "source_type": "url",
+        "source_id": "src-1",
+        "title": "YouTube Video",
+    }
     bulk_result = add_sources_result or {
         "results": [
             {"source_type": "url", "source_id": "src-1", "title": "Video A"},
@@ -38,8 +43,14 @@ def _patch_deps(mock_client, add_source_result=None, add_sources_result=None):
     return [
         patch("notebooklm_tools.cli.commands.source.get_alias_manager", return_value=alias_mgr),
         patch("notebooklm_tools.cli.commands.source.get_client", return_value=mock_client),
-        patch("notebooklm_tools.cli.commands.source.sources_service.add_source", return_value=single_result),
-        patch("notebooklm_tools.cli.commands.source.sources_service.add_sources", return_value=bulk_result),
+        patch(
+            "notebooklm_tools.cli.commands.source.sources_service.add_source",
+            return_value=single_result,
+        ),
+        patch(
+            "notebooklm_tools.cli.commands.source.sources_service.add_sources",
+            return_value=bulk_result,
+        ),
     ]
 
 
@@ -47,12 +58,14 @@ class TestYoutubeSingle:
     """Single --youtube flag: existing behaviour must be preserved."""
 
     def test_single_youtube_calls_add_source(self, runner, mock_client):
-        with _patch_deps(mock_client)[0], _patch_deps(mock_client)[1], \
-             patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias, \
-             patch("notebooklm_tools.cli.commands.source.get_client") as m_client, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk:
-
+        with (
+            _patch_deps(mock_client)[0],
+            _patch_deps(mock_client)[1],
+            patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias,
+            patch("notebooklm_tools.cli.commands.source.get_client") as m_client,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk,
+        ):
             m_alias.return_value.resolve.side_effect = lambda x: x
             m_client.return_value = mock_client
             m_add.return_value = {"source_type": "url", "source_id": "src-1", "title": "My Video"}
@@ -67,11 +80,12 @@ class TestYoutubeSingle:
         m_bulk.assert_not_called()
 
     def test_single_youtube_output_shows_title(self, runner, mock_client):
-        with patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias, \
-             patch("notebooklm_tools.cli.commands.source.get_client") as m_client, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_sources"):
-
+        with (
+            patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias,
+            patch("notebooklm_tools.cli.commands.source.get_client") as m_client,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_sources"),
+        ):
             m_alias.return_value.resolve.side_effect = lambda x: x
             m_client.return_value = mock_client
             m_add.return_value = {"source_type": "url", "source_id": "src-1", "title": "My Video"}
@@ -94,20 +108,27 @@ class TestYoutubeBulk:
             "added_count": 2,
         }
 
-        with patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias, \
-             patch("notebooklm_tools.cli.commands.source.get_client") as m_client, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk:
-
+        with (
+            patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias,
+            patch("notebooklm_tools.cli.commands.source.get_client") as m_client,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk,
+        ):
             m_alias.return_value.resolve.side_effect = lambda x: x
             m_client.return_value = mock_client
             m_bulk.return_value = bulk_result
 
-            result = runner.invoke(app, [
-                "add", "nb-123",
-                "--youtube", "https://youtu.be/aaa",
-                "--youtube", "https://youtu.be/bbb",
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "add",
+                    "nb-123",
+                    "--youtube",
+                    "https://youtu.be/aaa",
+                    "--youtube",
+                    "https://youtu.be/bbb",
+                ],
+            )
 
         assert result.exit_code == 0
         m_add.assert_not_called()
@@ -127,20 +148,27 @@ class TestYoutubeBulk:
             "added_count": 2,
         }
 
-        with patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias, \
-             patch("notebooklm_tools.cli.commands.source.get_client") as m_client, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_source"), \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk:
-
+        with (
+            patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias,
+            patch("notebooklm_tools.cli.commands.source.get_client") as m_client,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_source"),
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk,
+        ):
             m_alias.return_value.resolve.side_effect = lambda x: x
             m_client.return_value = mock_client
             m_bulk.return_value = bulk_result
 
-            result = runner.invoke(app, [
-                "add", "nb-123",
-                "--youtube", "https://youtu.be/aaa",
-                "--youtube", "https://youtu.be/bbb",
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "add",
+                    "nb-123",
+                    "--youtube",
+                    "https://youtu.be/aaa",
+                    "--youtube",
+                    "https://youtu.be/bbb",
+                ],
+            )
 
         assert result.exit_code == 0
         assert "Video A" in result.output
@@ -149,25 +177,36 @@ class TestYoutubeBulk:
 
     def test_bulk_youtube_three_urls(self, runner, mock_client):
         bulk_result = {
-            "results": [{"source_type": "url", "source_id": f"src-{i}", "title": f"Video {i}"} for i in range(3)],
+            "results": [
+                {"source_type": "url", "source_id": f"src-{i}", "title": f"Video {i}"}
+                for i in range(3)
+            ],
             "added_count": 3,
         }
 
-        with patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias, \
-             patch("notebooklm_tools.cli.commands.source.get_client") as m_client, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_source"), \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk:
-
+        with (
+            patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias,
+            patch("notebooklm_tools.cli.commands.source.get_client") as m_client,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_source"),
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk,
+        ):
             m_alias.return_value.resolve.side_effect = lambda x: x
             m_client.return_value = mock_client
             m_bulk.return_value = bulk_result
 
-            result = runner.invoke(app, [
-                "add", "nb-123",
-                "-y", "https://youtu.be/a",
-                "-y", "https://youtu.be/b",
-                "-y", "https://youtu.be/c",
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "add",
+                    "nb-123",
+                    "-y",
+                    "https://youtu.be/a",
+                    "-y",
+                    "https://youtu.be/b",
+                    "-y",
+                    "https://youtu.be/c",
+                ],
+            )
 
         assert result.exit_code == 0
         sources_arg = m_bulk.call_args.args[2]
@@ -186,20 +225,27 @@ class TestMixedUrlAndYoutube:
             "added_count": 2,
         }
 
-        with patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias, \
-             patch("notebooklm_tools.cli.commands.source.get_client") as m_client, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add, \
-             patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk:
-
+        with (
+            patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias,
+            patch("notebooklm_tools.cli.commands.source.get_client") as m_client,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_source") as m_add,
+            patch("notebooklm_tools.cli.commands.source.sources_service.add_sources") as m_bulk,
+        ):
             m_alias.return_value.resolve.side_effect = lambda x: x
             m_client.return_value = mock_client
             m_bulk.return_value = bulk_result
 
-            result = runner.invoke(app, [
-                "add", "nb-123",
-                "--url", "https://example.com",
-                "--youtube", "https://youtu.be/abc",
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "add",
+                    "nb-123",
+                    "--url",
+                    "https://example.com",
+                    "--youtube",
+                    "https://youtu.be/abc",
+                ],
+            )
 
         # --url and --youtube are different source types, should be rejected
         assert result.exit_code != 0
@@ -220,11 +266,17 @@ class TestYoutubeValidation:
         with patch("notebooklm_tools.cli.commands.source.get_alias_manager") as m_alias:
             m_alias.return_value.resolve.side_effect = lambda x: x
 
-            result = runner.invoke(app, [
-                "add", "nb-123",
-                "--youtube", "https://youtu.be/abc",
-                "--text", "some text",
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "add",
+                    "nb-123",
+                    "--youtube",
+                    "https://youtu.be/abc",
+                    "--text",
+                    "some text",
+                ],
+            )
 
         assert result.exit_code != 0
         assert "one source type" in result.output

@@ -1,40 +1,44 @@
 """Sharing service — shared business logic for notebook sharing and collaboration."""
 
-from typing import TypedDict, Literal, Optional
+from typing import TypedDict
 
 from ..core.client import NotebookLMClient
-from ..core.data_types import ShareStatus, Collaborator
-from .errors import ValidationError, ServiceError
+from ..core.data_types import Collaborator, ShareStatus
+from .errors import ServiceError, ValidationError
 
 
 class CollaboratorInfo(TypedDict):
     """Collaborator details."""
+
     email: str
     role: str
     is_pending: bool
-    display_name: Optional[str]
+    display_name: str | None
 
 
 class ShareStatusResult(TypedDict):
     """Result of a share status check."""
+
     notebook_id: str
     is_public: bool
     access_level: str
-    public_link: Optional[str]
+    public_link: str | None
     collaborators: list[CollaboratorInfo]
     collaborator_count: int
 
 
 class PublicAccessResult(TypedDict):
     """Result of a public access change."""
+
     notebook_id: str
     is_public: bool
-    public_link: Optional[str]
+    public_link: str | None
     message: str
 
 
 class InviteResult(TypedDict):
     """Result of a collaborator invitation."""
+
     notebook_id: str
     email: str
     role: str
@@ -43,12 +47,14 @@ class InviteResult(TypedDict):
 
 class RecipientInfo(TypedDict):
     """Individual recipient in a bulk invite."""
+
     email: str
     role: str
 
 
 class BulkInviteResult(TypedDict):
     """Result of a bulk collaborator invitation."""
+
     notebook_id: str
     invited_count: int
     recipients: list[RecipientInfo]
@@ -90,7 +96,7 @@ def get_share_status(client: NotebookLMClient, notebook_id: str) -> ShareStatusR
             "collaborator_count": len(collaborators),
         }
     except Exception as e:
-        raise ServiceError(f"Failed to get share status: {e}")
+        raise ServiceError(f"Failed to get share status: {e}") from e
 
 
 def set_public_access(
@@ -128,7 +134,7 @@ def set_public_access(
                 "message": "Public link access disabled.",
             }
     except Exception as e:
-        raise ServiceError(f"Failed to set public access: {e}")
+        raise ServiceError(f"Failed to set public access: {e}") from e
 
 
 def invite_collaborator(
@@ -175,7 +181,7 @@ def invite_collaborator(
     except ServiceError:
         raise
     except Exception as e:
-        raise ServiceError(f"Failed to invite collaborator: {e}")
+        raise ServiceError(f"Failed to invite collaborator: {e}") from e
 
 
 def invite_collaborators_bulk(
@@ -238,4 +244,4 @@ def invite_collaborators_bulk(
     except ServiceError:
         raise
     except Exception as e:
-        raise ServiceError(f"Failed to invite collaborators: {e}")
+        raise ServiceError(f"Failed to invite collaborators: {e}") from e

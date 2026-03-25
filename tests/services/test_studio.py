@@ -1,20 +1,20 @@
 """Tests for services.studio module."""
 
 import json
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock, patch
 
+from notebooklm_tools.services.errors import ServiceError, ValidationError
 from notebooklm_tools.services.studio import (
-    validate_artifact_type,
-    resolve_code,
+    VALID_ARTIFACT_TYPES,
     create_artifact,
+    delete_artifact,
     get_studio_status,
     rename_artifact,
-    delete_artifact,
-    VALID_ARTIFACT_TYPES,
+    resolve_code,
+    validate_artifact_type,
 )
-from notebooklm_tools.services.errors import ValidationError, ServiceError
 
 
 @pytest.fixture
@@ -140,7 +140,9 @@ class TestCreateArtifact:
 
     def test_create_data_table(self, mock_client):
         result = create_artifact(
-            mock_client, "nb-1", "data_table",
+            mock_client,
+            "nb-1",
+            "data_table",
             description="Compare features",
         )
         assert result["artifact_type"] == "data_table"

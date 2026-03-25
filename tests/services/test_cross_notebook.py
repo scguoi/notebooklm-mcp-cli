@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from notebooklm_tools.services.cross_notebook import (
-    cross_notebook_query,
     _query_single_notebook,
     _resolve_notebook_ids,
+    cross_notebook_query,
 )
 from notebooklm_tools.services.errors import ValidationError
 
@@ -17,9 +17,39 @@ def mock_client():
     """Create a mock NotebookLMClient."""
     client = MagicMock()
     client.list_notebooks.return_value = [
-        MagicMock(id="nb-001", title="AI Research", source_count=3, url="", ownership="owned", is_shared=False, is_owned=True, created_at=None, modified_at=None),
-        MagicMock(id="nb-002", title="Dev Tools", source_count=2, url="", ownership="owned", is_shared=False, is_owned=True, created_at=None, modified_at=None),
-        MagicMock(id="nb-003", title="Courses", source_count=1, url="", ownership="owned", is_shared=False, is_owned=True, created_at=None, modified_at=None),
+        MagicMock(
+            id="nb-001",
+            title="AI Research",
+            source_count=3,
+            url="",
+            ownership="owned",
+            is_shared=False,
+            is_owned=True,
+            created_at=None,
+            modified_at=None,
+        ),
+        MagicMock(
+            id="nb-002",
+            title="Dev Tools",
+            source_count=2,
+            url="",
+            ownership="owned",
+            is_shared=False,
+            is_owned=True,
+            created_at=None,
+            modified_at=None,
+        ),
+        MagicMock(
+            id="nb-003",
+            title="Courses",
+            source_count=1,
+            url="",
+            ownership="owned",
+            is_shared=False,
+            is_owned=True,
+            created_at=None,
+            modified_at=None,
+        ),
     ]
     client.query.return_value = {
         "answer": "Test answer",
@@ -85,9 +115,7 @@ class TestResolveNotebookIds:
 
 class TestCrossNotebookQuery:
     def test_query_all_notebooks(self, mock_client):
-        result = cross_notebook_query(
-            mock_client, "test query", all_notebooks=True
-        )
+        result = cross_notebook_query(mock_client, "test query", all_notebooks=True)
         assert result["query"] == "test query"
         assert result["notebooks_queried"] == 3
         assert result["notebooks_succeeded"] == 3
@@ -96,7 +124,8 @@ class TestCrossNotebookQuery:
 
     def test_query_specific_notebooks(self, mock_client):
         result = cross_notebook_query(
-            mock_client, "test query",
+            mock_client,
+            "test query",
             notebook_names=["AI Research", "Dev Tools"],
         )
         assert result["notebooks_queried"] == 2
@@ -125,9 +154,7 @@ class TestCrossNotebookQuery:
 
         mock_client.query.side_effect = side_effect
 
-        result = cross_notebook_query(
-            mock_client, "test query", all_notebooks=True
-        )
+        result = cross_notebook_query(mock_client, "test query", all_notebooks=True)
         assert result["notebooks_queried"] == 3
         assert result["notebooks_succeeded"] == 2
         assert result["notebooks_failed"] == 1
@@ -143,9 +170,7 @@ class TestCrossNotebookQuery:
 
         mock_client.query.side_effect = side_effect
 
-        result = cross_notebook_query(
-            mock_client, "test query", all_notebooks=True
-        )
+        result = cross_notebook_query(mock_client, "test query", all_notebooks=True)
         # Successful results should come first
         errors = [r for r in result["results"] if r["error"] is not None]
         successes = [r for r in result["results"] if r["error"] is None]
@@ -156,15 +181,14 @@ class TestCrossNotebookQuery:
 
     def test_no_matching_notebooks(self, mock_client):
         mock_client.list_notebooks.return_value = []
-        result = cross_notebook_query(
-            mock_client, "test query", all_notebooks=True
-        )
+        result = cross_notebook_query(mock_client, "test query", all_notebooks=True)
         assert result["notebooks_queried"] == 0
         assert result["results"] == []
 
     def test_max_concurrent_limits_threads(self, mock_client):
         result = cross_notebook_query(
-            mock_client, "test query",
+            mock_client,
+            "test query",
             all_notebooks=True,
             max_concurrent=1,
         )

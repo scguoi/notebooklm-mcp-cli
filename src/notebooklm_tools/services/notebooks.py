@@ -1,25 +1,27 @@
 """Notebooks service — shared business logic for notebook CRUD and metadata operations."""
 
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 from ..core.client import NotebookLMClient
-from .errors import ValidationError, ServiceError, NotFoundError, CreationError
+from .errors import CreationError, NotFoundError, ServiceError, ValidationError
 
 
 class NotebookInfo(TypedDict):
     """Notebook summary info."""
+
     id: str
     title: str
     source_count: int
     url: str
     ownership: str
     is_shared: bool
-    created_at: Optional[str]
-    modified_at: Optional[str]
+    created_at: str | None
+    modified_at: str | None
 
 
 class NotebookListResult(TypedDict):
     """Result of listing notebooks."""
+
     notebooks: list[NotebookInfo]
     count: int
     owned_count: int
@@ -29,12 +31,14 @@ class NotebookListResult(TypedDict):
 
 class SourceInfo(TypedDict):
     """Source summary in notebook details."""
+
     id: str
     title: str
 
 
 class NotebookDetailResult(TypedDict):
     """Result of getting a single notebook's details."""
+
     notebook_id: str
     title: str
     source_count: int
@@ -44,12 +48,14 @@ class NotebookDetailResult(TypedDict):
 
 class NotebookSummaryResult(TypedDict):
     """Result of AI-generated notebook summary."""
+
     summary: str
     suggested_topics: list[str]
 
 
 class NotebookCreateResult(TypedDict):
     """Result of creating a notebook."""
+
     notebook_id: str
     title: str
     url: str
@@ -58,6 +64,7 @@ class NotebookCreateResult(TypedDict):
 
 class NotebookRenameResult(TypedDict):
     """Result of renaming a notebook."""
+
     notebook_id: str
     new_title: str
     message: str
@@ -65,6 +72,7 @@ class NotebookRenameResult(TypedDict):
 
 class NotebookDeleteResult(TypedDict):
     """Result of deleting a notebook."""
+
     message: str
 
 
@@ -87,7 +95,7 @@ def list_notebooks(
     try:
         notebooks = client.list_notebooks()
     except Exception as e:
-        raise ServiceError(f"Failed to list notebooks: {e}")
+        raise ServiceError(f"Failed to list notebooks: {e}") from e
 
     owned_count = sum(1 for nb in notebooks if nb.is_owned)
     shared_count = len(notebooks) - owned_count
@@ -137,7 +145,7 @@ def get_notebook(
     try:
         nb = client.get_notebook(notebook_id)
     except Exception as e:
-        raise ServiceError(f"Failed to get notebook: {e}")
+        raise ServiceError(f"Failed to get notebook: {e}") from e
 
     if not nb:
         raise NotFoundError(
@@ -205,7 +213,7 @@ def describe_notebook(
     try:
         result = client.get_notebook_summary(notebook_id)
     except Exception as e:
-        raise ServiceError(f"Failed to get notebook summary: {e}")
+        raise ServiceError(f"Failed to get notebook summary: {e}") from e
 
     if result:
         return {
@@ -238,7 +246,7 @@ def create_notebook(
     try:
         nb = client.create_notebook(title)
     except Exception as e:
-        raise CreationError(f"Failed to create notebook: {e}")
+        raise CreationError(f"Failed to create notebook: {e}") from e
 
     if nb and hasattr(nb, "id"):
         return {
@@ -282,7 +290,7 @@ def rename_notebook(
     try:
         result = client.rename_notebook(notebook_id, new_title)
     except Exception as e:
-        raise ServiceError(f"Failed to rename notebook: {e}")
+        raise ServiceError(f"Failed to rename notebook: {e}") from e
 
     if result:
         return {
@@ -316,7 +324,7 @@ def delete_notebook(
     try:
         result = client.delete_notebook(notebook_id)
     except Exception as e:
-        raise ServiceError(f"Failed to delete notebook: {e}")
+        raise ServiceError(f"Failed to delete notebook: {e}") from e
 
     if result:
         return {

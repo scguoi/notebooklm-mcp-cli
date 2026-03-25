@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """StudioMixin for NotebookLM client - studio content creation and status."""
 
-from typing import Callable
+import contextlib
 
 from . import constants
 from .base import BaseClient
@@ -66,7 +66,9 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the nested format: [[[id1]], [[id2]], ...]
         sources_nested = [[[sid]] for sid in source_ids]
@@ -76,27 +78,13 @@ class StudioMixin(BaseClient):
 
         audio_options = [
             None,
-            [
-                focus_prompt,
-                length_code,
-                None,
-                sources_simple,
-                language,
-                None,
-                format_code
-            ]
+            [focus_prompt, length_code, None, sources_simple, language, None, format_code],
         ]
 
         params = [
             [2],
             notebook_id,
-            [
-                None, None,
-                self.STUDIO_TYPE_AUDIO,
-                sources_nested,
-                None, None,
-                audio_options
-            ]
+            [None, None, self.STUDIO_TYPE_AUDIO, sources_nested, None, None, audio_options],
         ]
 
         body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
@@ -110,14 +98,26 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "audio",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "format": constants.AUDIO_FORMATS.get_name(format_code),
                 "length": constants.AUDIO_LENGTHS.get_name(length_code),
                 "language": language,
@@ -142,7 +142,9 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the nested format: [[[id1]], [[id2]], ...]
         sources_nested = [[[sid]] for sid in source_ids]
@@ -167,12 +169,16 @@ class StudioMixin(BaseClient):
             [2],
             notebook_id,
             [
-                None, None,
+                None,
+                None,
                 self.STUDIO_TYPE_VIDEO,
                 sources_nested,
-                None, None, None, None,
-                video_options
-            ]
+                None,
+                None,
+                None,
+                None,
+                video_options,
+            ],
         ]
 
         body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
@@ -186,16 +192,30 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "video",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "format": constants.VIDEO_FORMATS.get_name(format_code),
-                "visual_style": constants.VIDEO_STYLES.get_name(visual_style_code) if format_code != constants.VIDEO_FORMAT_CINEMATIC else None,
+                "visual_style": constants.VIDEO_STYLES.get_name(visual_style_code)
+                if format_code != constants.VIDEO_FORMAT_CINEMATIC
+                else None,
                 "language": language,
             }
 
@@ -271,7 +291,9 @@ class StudioMixin(BaseClient):
                     slide_deck_options = artifact_data[16]
                     if isinstance(slide_deck_options, list) and len(slide_deck_options) > 0:
                         # URL is typically at position 0 in the options
-                        if isinstance(slide_deck_options[0], str) and slide_deck_options[0].startswith("http"):
+                        if isinstance(slide_deck_options[0], str) and slide_deck_options[
+                            0
+                        ].startswith("http"):
                             slide_deck_url = slide_deck_options[0]
                         # Or may be nested deeper
                         elif len(slide_deck_options) > 3 and isinstance(slide_deck_options[3], str):
@@ -283,10 +305,14 @@ class StudioMixin(BaseClient):
                     report_options = artifact_data[7]
                     if isinstance(report_options, list) and len(report_options) > 1:
                         # Content is nested in the options
-                        content_data = report_options[1] if isinstance(report_options[1], list) else None
+                        content_data = (
+                            report_options[1] if isinstance(report_options[1], list) else None
+                        )
                         if content_data and len(content_data) > 0:
                             # Report content is typically markdown text
-                            report_content = content_data[0] if isinstance(content_data[0], str) else None
+                            report_content = (
+                                content_data[0] if isinstance(content_data[0], str) else None
+                            )
 
                 # Flashcard/Quiz artifacts have cards data at position 9
                 # Quiz and Flashcards share type code 4, distinguished by options[1][0]:
@@ -304,9 +330,13 @@ class StudioMixin(BaseClient):
                             if format_code == 2:
                                 is_quiz = True
                         # Count cards in the data
-                        cards_data = flashcard_options[1] if isinstance(flashcard_options[1], list) else None
+                        cards_data = (
+                            flashcard_options[1] if isinstance(flashcard_options[1], list) else None
+                        )
                         if cards_data:
-                            flashcard_count = len(cards_data) if isinstance(cards_data, list) else None
+                            flashcard_count = (
+                                len(cards_data) if isinstance(cards_data, list) else None
+                            )
 
                 # Extract created_at timestamp
                 # Position varies by type but often at position 10, 15, or similar
@@ -315,9 +345,12 @@ class StudioMixin(BaseClient):
                 for ts_pos in [10, 15, 17]:
                     if len(artifact_data) > ts_pos:
                         ts_candidate = artifact_data[ts_pos]
-                        if isinstance(ts_candidate, list) and len(ts_candidate) >= 2:
+                        if isinstance(ts_candidate, list) and len(ts_candidate) >= 2:  # noqa: SIM102
                             # Check if it looks like a timestamp [seconds, nanos]
-                            if isinstance(ts_candidate[0], (int, float)) and ts_candidate[0] > 1700000000:
+                            if (
+                                isinstance(ts_candidate[0], (int, float))
+                                and ts_candidate[0] > 1700000000
+                            ):
                                 created_at = parse_timestamp(ts_candidate)
                                 break
 
@@ -339,7 +372,6 @@ class StudioMixin(BaseClient):
                 }
                 status = status_map.get(status_code, "unknown")
 
-
                 # Extract custom_instructions (focus prompt) if present
                 # Different artifact types store prompts at different indices:
                 # - Audio: artifact_data[6][1][0]
@@ -347,59 +379,58 @@ class StudioMixin(BaseClient):
                 # - Slides: artifact_data[16][0][0]
                 # - Quiz/Flashcards: artifact_data[9][1][1]
                 custom_instructions = None
-                
+
                 if type_code == self.STUDIO_TYPE_AUDIO and len(artifact_data) > 6:
                     options_data = artifact_data[6]
                     if isinstance(options_data, list) and len(options_data) > 1:
                         inner = options_data[1]
-                        if isinstance(inner, list) and len(inner) > 0:
+                        if isinstance(inner, list) and len(inner) > 0:  # noqa: SIM102
                             if isinstance(inner[0], str) and inner[0]:
                                 custom_instructions = inner[0]
-                
+
                 elif type_code == self.STUDIO_TYPE_VIDEO and len(artifact_data) > 8:
                     options_data = artifact_data[8]
                     if isinstance(options_data, list) and len(options_data) > 2:
                         inner = options_data[2]
-                        if isinstance(inner, list) and len(inner) > 2:
+                        if isinstance(inner, list) and len(inner) > 2:  # noqa: SIM102
                             if isinstance(inner[2], str) and inner[2]:
                                 custom_instructions = inner[2]
-                
+
                 elif type_code == self.STUDIO_TYPE_SLIDE_DECK and len(artifact_data) > 16:
                     options_data = artifact_data[16]
                     if isinstance(options_data, list) and len(options_data) > 0:
                         inner = options_data[0]
-                        if isinstance(inner, list) and len(inner) > 0:
+                        if isinstance(inner, list) and len(inner) > 0:  # noqa: SIM102
                             if isinstance(inner[0], str) and inner[0]:
                                 custom_instructions = inner[0]
-                
+
                 elif type_code == self.STUDIO_TYPE_FLASHCARDS and len(artifact_data) > 9:
                     # Quiz and Flashcards both use type 4, stored at position 9
                     # Format: ['', [format_code, None, 'prompt_text', 'lang', ...]]
                     options_data = artifact_data[9]
                     if isinstance(options_data, list) and len(options_data) > 1:
                         inner = options_data[1]
-                        if isinstance(inner, list) and len(inner) > 2:
+                        if isinstance(inner, list) and len(inner) > 2:  # noqa: SIM102
                             if isinstance(inner[2], str) and inner[2]:
                                 custom_instructions = inner[2].strip()  # Strip whitespace/newlines
 
-
-
-
-                artifacts.append({
-                    "artifact_id": artifact_id,
-                    "title": title,
-                    "type": artifact_type,
-                    "status": status,
-                    "created_at": created_at,
-                    "custom_instructions": custom_instructions,
-                    "audio_url": audio_url,
-                    "video_url": video_url,
-                    "infographic_url": infographic_url,
-                    "slide_deck_url": slide_deck_url,
-                    "report_content": report_content,
-                    "flashcard_count": flashcard_count,
-                    "duration_seconds": duration_seconds,
-                })
+                artifacts.append(
+                    {
+                        "artifact_id": artifact_id,
+                        "title": title,
+                        "type": artifact_type,
+                        "status": status,
+                        "created_at": created_at,
+                        "custom_instructions": custom_instructions,
+                        "audio_url": audio_url,
+                        "video_url": video_url,
+                        "infographic_url": infographic_url,
+                        "slide_deck_url": slide_deck_url,
+                        "report_content": report_content,
+                        "flashcard_count": flashcard_count,
+                        "duration_seconds": duration_seconds,
+                    }
+                )
 
         return artifacts
 
@@ -448,9 +479,7 @@ class StudioMixin(BaseClient):
         """
         # 1. We need the artifact-specific timestamp from LIST_MIND_MAPS
         params = [notebook_id]
-        list_result = self._call_rpc(
-            self.RPC_LIST_MIND_MAPS, params, f"/notebook/{notebook_id}"
-        )
+        list_result = self._call_rpc(self.RPC_LIST_MIND_MAPS, params, f"/notebook/{notebook_id}")
 
         timestamp = None
         if list_result and isinstance(list_result, list) and len(list_result) > 0:
@@ -458,10 +487,8 @@ class StudioMixin(BaseClient):
             for mm_entry in mm_list:
                 if isinstance(mm_entry, list) and mm_entry[0] == mind_map_id:
                     # Based on debug output: item[1][2][2] contains [seconds, micros]
-                    try:
+                    with contextlib.suppress(IndexError, TypeError):
                         timestamp = mm_entry[1][2][2]
-                    except (IndexError, TypeError):
-                        pass
                     break
 
         # 2. Step 1: UUID-based deletion (AH0mwd)
@@ -534,7 +561,11 @@ class StudioMixin(BaseClient):
                     "artifact_id": new_artifact_id,
                     "title": title,
                     "original_artifact_id": artifact_id,
-                    "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                    "status": "in_progress"
+                    if status_code == 1
+                    else "completed"
+                    if status_code == 3
+                    else "unknown",
                 }
 
         return None
@@ -557,28 +588,45 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the nested format: [[[id1]], [[id2]], ...]
         sources_nested = [[[sid]] for sid in source_ids]
 
         # Options at position 14: [[focus_prompt, language, null, orientation, detail_level, visual_style]]
         # Captured RPC structure: [[null, "en", null, 1, 2, 2]]
-        infographic_options = [[focus_prompt or None, language, None, orientation_code, detail_level_code, visual_style_code]]
+        infographic_options = [
+            [
+                focus_prompt or None,
+                language,
+                None,
+                orientation_code,
+                detail_level_code,
+                visual_style_code,
+            ]
+        ]
 
         content = [
-            None, None,
+            None,
+            None,
             self.STUDIO_TYPE_INFOGRAPHIC,
             sources_nested,
-            None, None, None, None, None, None, None, None, None, None,  # 10 nulls (positions 4-13)
-            infographic_options  # position 14
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,  # 10 nulls (positions 4-13)
+            infographic_options,  # position 14
         ]
 
-        params = [
-            [2],
-            notebook_id,
-            content
-        ]
+        params = [[2], notebook_id, content]
 
         body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
         url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
@@ -591,14 +639,26 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "infographic",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "orientation": constants.INFOGRAPHIC_ORIENTATIONS.get_name(orientation_code),
                 "detail_level": constants.INFOGRAPHIC_DETAILS.get_name(detail_level_code),
                 "visual_style": constants.INFOGRAPHIC_STYLES.get_name(visual_style_code),
@@ -624,7 +684,9 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the nested format: [[[id1]], [[id2]], ...]
         sources_nested = [[[sid]] for sid in source_ids]
@@ -633,18 +695,26 @@ class StudioMixin(BaseClient):
         slide_deck_options = [[focus_prompt or None, language, format_code, length_code]]
 
         content = [
-            None, None,
+            None,
+            None,
             self.STUDIO_TYPE_SLIDE_DECK,
             sources_nested,
-            None, None, None, None, None, None, None, None, None, None, None, None,  # 12 nulls (positions 4-15)
-            slide_deck_options  # position 16
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,  # 12 nulls (positions 4-15)
+            slide_deck_options,  # position 16
         ]
 
-        params = [
-            [2],
-            notebook_id,
-            content
-        ]
+        params = [[2], notebook_id, content]
 
         body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
         url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
@@ -657,14 +727,26 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "slide_deck",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "format": constants.SLIDE_DECK_FORMATS.get_name(format_code),
                 "length": constants.SLIDE_DECK_LENGTHS.get_name(length_code),
                 "language": language,
@@ -688,7 +770,9 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the nested format: [[[id1]], [[id2]], ...]
         sources_nested = [[[sid]] for sid in source_ids]
@@ -752,23 +836,22 @@ class StudioMixin(BaseClient):
                 language,
                 config["prompt"],
                 None,
-                True
-            ]
+                True,
+            ],
         ]
 
         content = [
-            None, None,
+            None,
+            None,
             self.STUDIO_TYPE_REPORT,
             sources_nested,
-            None, None, None,
-            report_options
+            None,
+            None,
+            None,
+            report_options,
         ]
 
-        params = [
-            [2],
-            notebook_id,
-            content
-        ]
+        params = [[2], notebook_id, content]
 
         body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
         url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
@@ -781,14 +864,26 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "report",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "format": report_format,
                 "language": language,
             }
@@ -810,7 +905,9 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the nested format: [[[id1]], [[id2]], ...]
         sources_nested = [[[sid]] for sid in source_ids]
@@ -824,24 +921,28 @@ class StudioMixin(BaseClient):
             [
                 1,  # Unknown (possibly default count base)
                 focus_prompt or None,  # Focus prompt
-                None, None, None, None,
-                [difficulty_code, count_code]
-            ]
+                None,
+                None,
+                None,
+                None,
+                [difficulty_code, count_code],
+            ],
         ]
 
         content = [
-            None, None,
+            None,
+            None,
             self.STUDIO_TYPE_FLASHCARDS,
             sources_nested,
-            None, None, None, None, None,  # 5 nulls (positions 4-8)
-            flashcard_options  # position 9
+            None,
+            None,
+            None,
+            None,
+            None,  # 5 nulls (positions 4-8)
+            flashcard_options,  # position 9
         ]
 
-        params = [
-            [2],
-            notebook_id,
-            content
-        ]
+        params = [[2], notebook_id, content]
 
         body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
         url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
@@ -854,14 +955,26 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "flashcards",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "difficulty": constants.FLASHCARD_DIFFICULTIES.get_name(difficulty_code),
             }
 
@@ -891,7 +1004,9 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         sources_nested = [[[sid]] for sid in source_ids]
 
@@ -901,17 +1016,26 @@ class StudioMixin(BaseClient):
             [
                 2,  # Format/variant code
                 focus_prompt or None,  # Focus prompt
-                None, None, None, None, None,
-                [question_count, difficulty]
-            ]
+                None,
+                None,
+                None,
+                None,
+                None,
+                [question_count, difficulty],
+            ],
         ]
 
         content = [
-            None, None,
+            None,
+            None,
             self.STUDIO_TYPE_FLASHCARDS,  # Type 4 (shared with flashcards)
             sources_nested,
-            None, None, None, None, None,
-            quiz_options  # position 9
+            None,
+            None,
+            None,
+            None,
+            None,
+            quiz_options,  # position 9
         ]
 
         params = [[2], notebook_id, content]
@@ -927,14 +1051,26 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "quiz",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "question_count": question_count,
                 "difficulty": constants.FLASHCARD_DIFFICULTIES.get_name(difficulty),
             }
@@ -963,7 +1099,9 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         sources_nested = [[[sid]] for sid in source_ids]
 
@@ -971,11 +1109,25 @@ class StudioMixin(BaseClient):
         datatable_options = [None, [description, language]]
 
         content = [
-            None, None,
+            None,
+            None,
             self.STUDIO_TYPE_DATA_TABLE,  # Type 9
             sources_nested,
-            None, None, None, None, None, None, None, None, None, None, None, None, None, None,  # 14 nulls (positions 4-17)
-            datatable_options  # position 18
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,  # 14 nulls (positions 4-17)
+            datatable_options,  # position 18
         ]
 
         params = [[2], notebook_id, content]
@@ -991,14 +1143,26 @@ class StudioMixin(BaseClient):
 
         if result and isinstance(result, list) and len(result) > 0:
             artifact_data = result[0]
-            artifact_id = artifact_data[0] if isinstance(artifact_data, list) and len(artifact_data) > 0 else None
-            status_code = artifact_data[4] if isinstance(artifact_data, list) and len(artifact_data) > 4 else None
+            artifact_id = (
+                artifact_data[0]
+                if isinstance(artifact_data, list) and len(artifact_data) > 0
+                else None
+            )
+            status_code = (
+                artifact_data[4]
+                if isinstance(artifact_data, list) and len(artifact_data) > 4
+                else None
+            )
 
             return {
                 "artifact_id": artifact_id,
                 "notebook_id": notebook_id,
                 "type": "data_table",
-                "status": "in_progress" if status_code == 1 else "completed" if status_code == 3 else "unknown",
+                "status": "in_progress"
+                if status_code == 1
+                else "completed"
+                if status_code == 3
+                else "unknown",
                 "description": description,
             }
 
@@ -1040,17 +1204,22 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the nested format: [[[id1]], [[id2]], ...]
         sources_nested = [[[sid]] for sid in source_ids]
 
         params = [
             sources_nested,
-            None, None, None, None,
+            None,
+            None,
+            None,
+            None,
             ["interactive_mindmap", [["[CONTEXT]", ""]], ""],
             None,
-            [2, None, [1]]
+            [2, None, [1]],
         ]
 
         body = self._build_request_body(self.RPC_GENERATE_MIND_MAP, params)
@@ -1110,20 +1279,16 @@ class StudioMixin(BaseClient):
             source_ids = self._get_all_source_ids(notebook_id)
 
         if not source_ids:
-            raise ValueError(f"No sources found in notebook {notebook_id}. Add sources before creating studio content.")
+            raise ValueError(
+                f"No sources found in notebook {notebook_id}. Add sources before creating studio content."
+            )
 
         # Build source IDs in the simpler format: [[id1], [id2], ...]
         sources_simple = [[sid] for sid in source_ids]
 
         metadata = [2, None, None, 5, sources_simple]
 
-        params = [
-            notebook_id,
-            mind_map_json,
-            metadata,
-            None,
-            title
-        ]
+        params = [notebook_id, mind_map_json, metadata, None, title]
 
         body = self._build_request_body(self.RPC_SAVE_MIND_MAP, params)
         url = self._build_url(self.RPC_SAVE_MIND_MAP, f"/notebook/{notebook_id}")
@@ -1175,7 +1340,7 @@ class StudioMixin(BaseClient):
                 # Tombstone format: [uuid, null, 2]
                 if not isinstance(mind_map_data, list) or len(mind_map_data) < 2:
                     continue
-                
+
                 details = mind_map_data[1]
                 if details is None:
                     # This is a tombstone/deleted entry, skip it
@@ -1194,11 +1359,13 @@ class StudioMixin(BaseClient):
                         ts = metadata[2]
                         created_at = parse_timestamp(ts)
 
-                    mind_maps.append({
-                        "mind_map_id": mind_map_id,
-                        "title": title,
-                        "mind_map_json": mind_map_json,
-                        "created_at": created_at,
-                    })
+                    mind_maps.append(
+                        {
+                            "mind_map_id": mind_map_id,
+                            "title": title,
+                            "mind_map_json": mind_map_json,
+                            "created_at": created_at,
+                        }
+                    )
 
         return mind_maps

@@ -40,7 +40,9 @@ def batch(
         confirm: Must be True for delete action
     """
     try:
-        names = [n.strip() for n in notebook_names.split(",") if n.strip()] if notebook_names else None
+        names = (
+            [n.strip() for n in notebook_names.split(",") if n.strip()] if notebook_names else None
+        )
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
 
         if action == "query":
@@ -52,14 +54,20 @@ def batch(
 
         elif action == "add_source":
             if not source_url:
-                return {"status": "error", "error": "source_url parameter is required for action=add_source"}
+                return {
+                    "status": "error",
+                    "error": "source_url parameter is required for action=add_source",
+                }
             client = get_client()
             result = batch_service.batch_add_source(client, source_url, names, tag_list, all)
             return {"status": "success", **result}
 
         elif action == "create":
             if not titles:
-                return {"status": "error", "error": "titles parameter is required for action=create"}
+                return {
+                    "status": "error",
+                    "error": "titles parameter is required for action=create",
+                }
             client = get_client()
             title_list = [t.strip() for t in titles.split(",") if t.strip()]
             result = batch_service.batch_create(client, title_list)
@@ -82,7 +90,10 @@ def batch(
             return {"status": "success", **result}
 
         else:
-            return {"status": "error", "error": f"Unknown action: {action}. Use: query, add_source, create, delete, studio"}
+            return {
+                "status": "error",
+                "error": f"Unknown action: {action}. Use: query, add_source, create, delete, studio",
+            }
 
     except ServiceError as e:
         err = {"status": "error", "error": e.user_message}

@@ -1,10 +1,11 @@
 """Tests for services.exports module."""
 
-import pytest
 from unittest.mock import MagicMock
 
-from notebooklm_tools.services.exports import export_artifact, ExportResult
-from notebooklm_tools.services.errors import ValidationError, ExportError
+import pytest
+
+from notebooklm_tools.services.errors import ExportError, ValidationError
+from notebooklm_tools.services.exports import export_artifact
 
 
 @pytest.fixture
@@ -27,9 +28,7 @@ class TestExportArtifactValidation:
 
     def test_export_type_case_insensitive(self, mock_client):
         """'DOCS' should be normalized to 'docs'."""
-        mock_client.export_artifact.return_value = {
-            "url": "https://docs.google.com/doc/123"
-        }
+        mock_client.export_artifact.return_value = {"url": "https://docs.google.com/doc/123"}
         result = export_artifact(
             client=mock_client,
             notebook_id="nb-123",
@@ -40,9 +39,7 @@ class TestExportArtifactValidation:
         assert result["export_type"] == "docs"
 
     def test_docs_type_accepted(self, mock_client):
-        mock_client.export_artifact.return_value = {
-            "url": "https://docs.google.com/doc/123"
-        }
+        mock_client.export_artifact.return_value = {"url": "https://docs.google.com/doc/123"}
         result = export_artifact(
             client=mock_client,
             notebook_id="nb-123",
@@ -68,9 +65,7 @@ class TestExportArtifactSuccess:
     """Test successful export operations."""
 
     def test_docs_export_returns_correct_result(self, mock_client):
-        mock_client.export_artifact.return_value = {
-            "url": "https://docs.google.com/doc/123"
-        }
+        mock_client.export_artifact.return_value = {"url": "https://docs.google.com/doc/123"}
         result = export_artifact(
             client=mock_client,
             notebook_id="nb-123",
@@ -100,9 +95,7 @@ class TestExportArtifactSuccess:
         assert "Google Sheets" in result["message"]
 
     def test_default_title_used_when_none(self, mock_client):
-        mock_client.export_artifact.return_value = {
-            "url": "https://docs.google.com/doc/123"
-        }
+        mock_client.export_artifact.return_value = {"url": "https://docs.google.com/doc/123"}
         export_artifact(
             client=mock_client,
             notebook_id="nb-123",
@@ -118,9 +111,7 @@ class TestExportArtifactSuccess:
         )
 
     def test_custom_title_passed_through(self, mock_client):
-        mock_client.export_artifact.return_value = {
-            "url": "https://docs.google.com/doc/123"
-        }
+        mock_client.export_artifact.return_value = {"url": "https://docs.google.com/doc/123"}
         export_artifact(
             client=mock_client,
             notebook_id="nb-123",
@@ -141,9 +132,7 @@ class TestExportArtifactFailure:
 
     def test_no_url_raises_export_error(self, mock_client):
         """Fail-fast: if API returns no URL, raise ExportError."""
-        mock_client.export_artifact.return_value = {
-            "message": "Quota exceeded"
-        }
+        mock_client.export_artifact.return_value = {"message": "Quota exceeded"}
         with pytest.raises(ExportError, match="no document URL"):
             export_artifact(
                 client=mock_client,
@@ -153,9 +142,7 @@ class TestExportArtifactFailure:
             )
 
     def test_no_url_preserves_api_message_in_user_message(self, mock_client):
-        mock_client.export_artifact.return_value = {
-            "message": "Quota exceeded"
-        }
+        mock_client.export_artifact.return_value = {"message": "Quota exceeded"}
         with pytest.raises(ExportError) as exc_info:
             export_artifact(
                 client=mock_client,

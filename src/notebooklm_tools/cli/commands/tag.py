@@ -18,18 +18,22 @@ app = typer.Typer(
 @app.command("add")
 def tag_add(
     notebook_id: str = typer.Argument(..., help="Notebook UUID or alias"),
-    tags: str = typer.Option(..., "--tags", "-t", help="Comma-separated tags (e.g. 'ai,research,llm')"),
+    tags: str = typer.Option(
+        ..., "--tags", "-t", help="Comma-separated tags (e.g. 'ai,research,llm')"
+    ),
     title: str = typer.Option("", "--title", help="Notebook title for display"),
 ) -> None:
     """Add tags to a notebook."""
     try:
         tag_list = [t.strip() for t in tags.split(",") if t.strip()]
         result = smart_select_service.tag_add(notebook_id, tag_list, title)
-        console.print(f"[green]\u2713[/green] Tags updated for [bold]{result.get('notebook_title') or notebook_id}[/bold]")
+        console.print(
+            f"[green]\u2713[/green] Tags updated for [bold]{result.get('notebook_title') or notebook_id}[/bold]"
+        )
         console.print(f"  Tags: {', '.join(result['tags'])}")
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("remove")
@@ -47,7 +51,7 @@ def tag_remove(
             console.print(f"[green]\u2713[/green] All tags removed from notebook {notebook_id}")
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("list")
@@ -57,7 +61,9 @@ def tag_list() -> None:
 
     if result["count"] == 0:
         console.print("[dim]No tagged notebooks.[/dim]")
-        console.print("\nUse [cyan]nlm tag add <notebook-id> --tags 'ai,research'[/cyan] to add tags.")
+        console.print(
+            "\nUse [cyan]nlm tag add <notebook-id> --tags 'ai,research'[/cyan] to add tags."
+        )
         return
 
     table = Table(title=f"Tagged Notebooks ({result['count']})")
@@ -93,4 +99,4 @@ def tag_select(
             console.print(f"  {i}. [cyan]{title}[/cyan] — {tags}")
     except ServiceError as e:
         console.print(f"[red]Error:[/red] {e.user_message}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e

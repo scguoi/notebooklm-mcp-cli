@@ -1,12 +1,13 @@
 """Tests for services.errors module."""
 
 import pytest
+
 from notebooklm_tools.services.errors import (
-    ServiceError,
-    ValidationError,
-    NotFoundError,
     CreationError,
     ExportError,
+    NotFoundError,
+    ServiceError,
+    ValidationError,
 )
 
 
@@ -42,23 +43,29 @@ class TestServiceError:
 class TestErrorHierarchy:
     """Ensure all errors inherit from ServiceError."""
 
-    @pytest.mark.parametrize("error_class", [
-        ValidationError,
-        NotFoundError,
-        CreationError,
-        ExportError,
-    ])
+    @pytest.mark.parametrize(
+        "error_class",
+        [
+            ValidationError,
+            NotFoundError,
+            CreationError,
+            ExportError,
+        ],
+    )
     def test_inherits_from_service_error(self, error_class):
         err = error_class("test")
         assert isinstance(err, ServiceError)
         assert isinstance(err, Exception)
 
-    @pytest.mark.parametrize("error_class", [
-        ValidationError,
-        NotFoundError,
-        CreationError,
-        ExportError,
-    ])
+    @pytest.mark.parametrize(
+        "error_class",
+        [
+            ValidationError,
+            NotFoundError,
+            CreationError,
+            ExportError,
+        ],
+    )
     def test_subclass_preserves_user_message(self, error_class):
         err = error_class("internal", user_message="user-facing")
         assert err.user_message == "user-facing"

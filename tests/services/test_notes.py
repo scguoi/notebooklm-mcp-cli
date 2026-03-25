@@ -1,15 +1,16 @@
 """Tests for services.notes module."""
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from notebooklm_tools.services.errors import ServiceError, ValidationError
 from notebooklm_tools.services.notes import (
-    list_notes,
     create_note,
-    update_note,
     delete_note,
+    list_notes,
+    update_note,
 )
-from notebooklm_tools.services.errors import ValidationError, ServiceError
 
 
 @pytest.fixture

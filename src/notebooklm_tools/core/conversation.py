@@ -48,17 +48,17 @@ class QueryRejectedError(NotebookLMError):
 
 class ConversationMixin(BaseClient):
     """Mixin providing query and conversation operations.
-    
+
     Methods:
         - query: Query the notebook with questions
         - clear_conversation: Clear conversation cache
         - get_conversation_history: Get conversation history
     """
-    
+
     # =========================================================================
     # Conversation Cache Management
     # =========================================================================
-    
+
     def _build_conversation_history(self, conversation_id: str) -> list | None:
         """Build the conversation history array for follow-up queries.
 
@@ -87,9 +87,7 @@ class ConversationMixin(BaseClient):
 
         return history if history else None
 
-    def _cache_conversation_turn(
-        self, conversation_id: str, query: str, answer: str
-    ) -> None:
+    def _cache_conversation_turn(self, conversation_id: str, query: str, answer: str) -> None:
         """Cache a conversation turn for future follow-up queries."""
         if conversation_id not in self._conversation_cache:
             self._conversation_cache[conversation_id] = []
@@ -111,10 +109,7 @@ class ConversationMixin(BaseClient):
         if not turns:
             return None
 
-        return [
-            {"turn": t.turn_number, "query": t.query, "answer": t.answer}
-            for t in turns
-        ]
+        return [{"turn": t.turn_number, "query": t.query, "answer": t.answer} for t in turns]
 
     def get_conversation_id(self, notebook_id: str) -> str | None:
         """Fetch the persistent conversation ID for a notebook from the server.
@@ -149,7 +144,7 @@ class ConversationMixin(BaseClient):
                     level2 = level1[0]
                     if isinstance(level2, str):
                         return level2
-                    elif isinstance(level2, list) and len(level2) > 0:
+                    elif isinstance(level2, list) and len(level2) > 0:  # noqa: SIM102
                         if isinstance(level2[0], str):
                             return level2[0]
             except (IndexError, TypeError):
@@ -293,7 +288,9 @@ class ConversationMixin(BaseClient):
         if server_conv_id and server_conv_id != conversation_id:
             # Migrate local cache to the server-assigned ID
             if conversation_id in self._conversation_cache:
-                self._conversation_cache[server_conv_id] = self._conversation_cache.pop(conversation_id)
+                self._conversation_cache[server_conv_id] = self._conversation_cache.pop(
+                    conversation_id
+                )
             conversation_id = server_conv_id
 
         # Cache this turn for future follow-ups (only if we got an answer)
@@ -469,7 +466,9 @@ class ConversationMixin(BaseClient):
 
         return None
 
-    def _extract_answer_from_chunk(self, json_str: str) -> tuple[str | None, bool, dict, str | None]:
+    def _extract_answer_from_chunk(
+        self, json_str: str
+    ) -> tuple[str | None, bool, dict, str | None]:
         """Extract answer text, citation data, and server-assigned conversation ID from a single JSON chunk.
 
         The chunk structure is:
@@ -568,7 +567,7 @@ class ConversationMixin(BaseClient):
                 continue
 
             # Detect: is this a direct segment [int, int, nested] or a wrapper [[seg], ...]?
-            if isinstance(element[0], (int, float)):
+            if isinstance(element[0], (int, float)):  # noqa: SIM108
                 # Direct segment
                 segments_to_process = [element]
             else:
@@ -583,9 +582,12 @@ class ConversationMixin(BaseClient):
                 nested = segment[2]
                 if not isinstance(nested, list):
                     # Table segment: insert placeholder, data goes in cited_table
-                    if (len(segment) > 4 and isinstance(segment[4], list)
-                            and len(segment[4]) >= 3
-                            and isinstance(segment[4][2], list)):
+                    if (
+                        len(segment) > 4
+                        and isinstance(segment[4], list)
+                        and len(segment[4]) >= 3
+                        and isinstance(segment[4][2], list)
+                    ):
                         texts.append("<cited_table>")
                     continue
                 for nested_group in nested:
@@ -673,10 +675,7 @@ class ConversationMixin(BaseClient):
             if not isinstance(element, list) or not element:
                 continue
 
-            if isinstance(element[0], (int, float)):
-                segments = [element]
-            else:
-                segments = element
+            segments = [element] if isinstance(element[0], (int, float)) else element
 
             for segment in segments:
                 if not isinstance(segment, list) or len(segment) < 3:
@@ -692,9 +691,7 @@ class ConversationMixin(BaseClient):
                 if len(table_info) < 3 or not isinstance(table_info[2], list):
                     continue
 
-                parsed_rows = ConversationMixin._extract_text_from_table_rows(
-                    table_info[2]
-                )
+                parsed_rows = ConversationMixin._extract_text_from_table_rows(table_info[2])
                 if parsed_rows:
                     return {
                         "num_columns": len(parsed_rows[0]),

@@ -1,13 +1,14 @@
 """Notes service — shared business logic for note CRUD operations."""
 
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 from ..core.client import NotebookLMClient
-from .errors import ValidationError, ServiceError, NotFoundError
+from .errors import ServiceError, ValidationError
 
 
 class NoteInfo(TypedDict):
     """Note details."""
+
     id: str
     title: str
     preview: str
@@ -15,6 +16,7 @@ class NoteInfo(TypedDict):
 
 class NoteListResult(TypedDict):
     """Result of listing notes."""
+
     notebook_id: str
     notes: list[NoteInfo]
     count: int
@@ -22,6 +24,7 @@ class NoteListResult(TypedDict):
 
 class NoteCreateResult(TypedDict):
     """Result of creating a note."""
+
     note_id: str
     title: str
     content_preview: str
@@ -30,6 +33,7 @@ class NoteCreateResult(TypedDict):
 
 class NoteUpdateResult(TypedDict):
     """Result of updating a note."""
+
     note_id: str
     updated: bool
     message: str
@@ -37,6 +41,7 @@ class NoteUpdateResult(TypedDict):
 
 class NoteDeleteResult(TypedDict):
     """Result of deleting a note."""
+
     note_id: str
     message: str
 
@@ -62,14 +67,14 @@ def list_notes(client: NotebookLMClient, notebook_id: str) -> NoteListResult:
             "count": len(notes),
         }
     except Exception as e:
-        raise ServiceError(f"Failed to list notes: {e}")
+        raise ServiceError(f"Failed to list notes: {e}") from e
 
 
 def create_note(
     client: NotebookLMClient,
     notebook_id: str,
     content: str,
-    title: Optional[str] = None,
+    title: str | None = None,
 ) -> NoteCreateResult:
     """Create a new note in a notebook.
 
@@ -97,7 +102,7 @@ def create_note(
     try:
         result = client.create_note(notebook_id, content, effective_title)
     except Exception as e:
-        raise ServiceError(f"Failed to create note: {e}")
+        raise ServiceError(f"Failed to create note: {e}") from e
 
     if result and result.get("id"):
         preview = content[:100] + ("..." if len(content) > 100 else "")
@@ -118,8 +123,8 @@ def update_note(
     client: NotebookLMClient,
     notebook_id: str,
     note_id: str,
-    content: Optional[str] = None,
-    title: Optional[str] = None,
+    content: str | None = None,
+    title: str | None = None,
 ) -> NoteUpdateResult:
     """Update a note's content and/or title.
 
@@ -146,7 +151,7 @@ def update_note(
     try:
         result = client.update_note(note_id, content, title, notebook_id)
     except Exception as e:
-        raise ServiceError(f"Failed to update note: {e}")
+        raise ServiceError(f"Failed to update note: {e}") from e
 
     if result:
         parts = []
@@ -188,7 +193,7 @@ def delete_note(
     try:
         result = client.delete_note(note_id, notebook_id)
     except Exception as e:
-        raise ServiceError(f"Failed to delete note: {e}")
+        raise ServiceError(f"Failed to delete note: {e}") from e
 
     if result:
         return {

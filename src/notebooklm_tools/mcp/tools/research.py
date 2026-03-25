@@ -2,8 +2,9 @@
 
 from typing import Any
 
+from ...services import ServiceError
+from ...services import research as research_service
 from ._utils import get_client, logged_tool
-from ...services import research as research_service, ServiceError
 
 
 @logged_tool()
@@ -29,8 +30,11 @@ def research_start(
     try:
         client = get_client()
         result = research_service.start_research(
-            client, notebook_id, query,
-            source=source, mode=mode,
+            client,
+            notebook_id,
+            query,
+            source=source,
+            mode=mode,
         )
         return {"status": "success", **result}
     except ServiceError as e:
@@ -66,7 +70,8 @@ def research_status(
     try:
         client = get_client()
         result = research_service.poll_research(
-            client, notebook_id,
+            client,
+            notebook_id,
             task_id=task_id,
             query=query,
             compact=compact,
@@ -101,7 +106,9 @@ def research_import(
     try:
         client = get_client()
         result = research_service.import_research(
-            client, notebook_id, task_id,
+            client,
+            notebook_id,
+            task_id,
             source_indices=source_indices,
             timeout=timeout,
         )

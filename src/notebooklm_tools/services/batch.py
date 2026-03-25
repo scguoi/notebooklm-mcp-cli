@@ -13,6 +13,7 @@ from .errors import ValidationError
 
 class BatchItemResult(TypedDict):
     """Result for a single item in a batch operation."""
+
     notebook_id: str
     notebook_title: str
     success: bool
@@ -22,6 +23,7 @@ class BatchItemResult(TypedDict):
 
 class BatchResult(TypedDict):
     """Aggregated batch operation result."""
+
     operation: str
     items: list[BatchItemResult]
     total: int
@@ -37,9 +39,8 @@ def _resolve_targets(
 ) -> list[tuple[str, str]]:
     """Resolve batch targets to (id, title) tuples. Reuses cross_notebook logic."""
     from . import cross_notebook as cross_notebook_service
-    return cross_notebook_service._resolve_notebook_ids(
-        client, notebook_names, tags, all_notebooks
-    )
+
+    return cross_notebook_service._resolve_notebook_ids(client, notebook_names, tags, all_notebooks)
 
 
 def _run_batch(
@@ -61,21 +62,25 @@ def _run_batch(
             nb_id, nb_title = futures[future]
             try:
                 result = future.result()
-                results.append({
-                    "notebook_id": nb_id,
-                    "notebook_title": nb_title,
-                    "success": True,
-                    "result": result,
-                    "error": None,
-                })
+                results.append(
+                    {
+                        "notebook_id": nb_id,
+                        "notebook_title": nb_title,
+                        "success": True,
+                        "result": result,
+                        "error": None,
+                    }
+                )
             except Exception as e:
-                results.append({
-                    "notebook_id": nb_id,
-                    "notebook_title": nb_title,
-                    "success": False,
-                    "result": None,
-                    "error": str(e),
-                })
+                results.append(
+                    {
+                        "notebook_id": nb_id,
+                        "notebook_title": nb_title,
+                        "success": False,
+                        "result": None,
+                        "error": str(e),
+                    }
+                )
 
     results.sort(key=lambda r: (not r["success"], r["notebook_title"]))
     succeeded = sum(1 for r in results if r["success"])
@@ -146,7 +151,13 @@ def batch_add_source(
 
     targets = _resolve_targets(client, notebook_names, tags, all_notebooks)
     if not targets:
-        return {"operation": "batch_add_source", "items": [], "total": 0, "succeeded": 0, "failed": 0}
+        return {
+            "operation": "batch_add_source",
+            "items": [],
+            "total": 0,
+            "succeeded": 0,
+            "failed": 0,
+        }
 
     def add_fn(nb_id, nb_title):
         return sources_service.add_source(client, nb_id, source_type="url", url=source_url)
@@ -165,7 +176,9 @@ def batch_create(
         titles: List of notebook titles to create
     """
     if not titles:
-        raise ValidationError("At least one title is required.", user_message="Please provide notebook titles.")
+        raise ValidationError(
+            "At least one title is required.", user_message="Please provide notebook titles."
+        )
 
     targets = [(f"new-{i}", title) for i, title in enumerate(titles)]
 

@@ -1,21 +1,23 @@
 # tests/core/test_base.py
 """Tests for BaseClient infrastructure class."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
 def test_base_client_import():
     """Test that BaseClient can be imported."""
     from notebooklm_tools.core.base import BaseClient
+
     assert BaseClient is not None
 
 
 def test_base_client_init():
     """Test BaseClient initialization with minimal args."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={"test": "cookie"})
         assert client.cookies == {"test": "cookie"}
         assert client._client is None
@@ -24,9 +26,9 @@ def test_base_client_init():
 def test_base_client_init_with_csrf():
     """Test BaseClient initialization with CSRF token (skips refresh)."""
     from notebooklm_tools.core.base import BaseClient
-    
+
     # When csrf_token is provided, _refresh_auth_tokens should NOT be called
-    with patch.object(BaseClient, '_refresh_auth_tokens') as mock_refresh:
+    with patch.object(BaseClient, "_refresh_auth_tokens") as mock_refresh:
         client = BaseClient(cookies={"test": "cookie"}, csrf_token="test_token")
         mock_refresh.assert_not_called()
         assert client.csrf_token == "test_token"
@@ -35,8 +37,8 @@ def test_base_client_init_with_csrf():
 def test_build_request_body():
     """Test building RPC request body."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="test_token")
         body = client._build_request_body("testRpc", ["param1"])
         assert "f.req=" in body
@@ -47,8 +49,8 @@ def test_build_request_body():
 def test_build_url():
     """Test building batchexecute URL."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="test_token", session_id="test_sid")
         url = client._build_url("testRpc", "/notebook/123")
         assert "rpcids=testRpc" in url
@@ -59,8 +61,8 @@ def test_build_url():
 def test_get_httpx_cookies_from_dict():
     """Test converting dict cookies to httpx.Cookies."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={"SID": "abc123"}, csrf_token="token")
         cookies = client._get_httpx_cookies()
         # Should have cookies for both domains
@@ -71,11 +73,9 @@ def test_get_httpx_cookies_from_dict():
 def test_get_httpx_cookies_from_list():
     """Test converting list of cookie dicts to httpx.Cookies."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
-        cookie_list = [
-            {"name": "SID", "value": "abc123", "domain": ".google.com", "path": "/"}
-        ]
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
+        cookie_list = [{"name": "SID", "value": "abc123", "domain": ".google.com", "path": "/"}]
         client = BaseClient(cookies=cookie_list, csrf_token="token")
         cookies = client._get_httpx_cookies()
         assert cookies.get("SID", domain=".google.com") == "abc123"
@@ -86,10 +86,10 @@ def test_get_httpx_cookies_from_list():
 def test_parse_response():
     """Test parsing batchexecute response."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="token")
-        
+
         # Simulate a typical batchexecute response
         response_text = """)]}'
 42
@@ -104,10 +104,10 @@ def test_parse_response():
 def test_extract_rpc_result():
     """Test extracting RPC result from parsed response."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="token")
-        
+
         parsed = [[["wrb.fr", "testRpc", '{"status": "ok"}']]]
         result = client._extract_rpc_result(parsed, "testRpc")
         assert result == {"status": "ok"}
@@ -118,15 +118,32 @@ def test_extract_rpc_result_raises_rpc_error_on_transient():
     from notebooklm_tools.core.base import BaseClient
     from notebooklm_tools.core.errors import RPCError
 
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="token")
 
         # Real failing deep response from Issue #98
-        parsed = [[[
-            "wrb.fr", "QA9ei", None, None, None,
-            [3, None, [["type.googleapis.com/google.internal.labs.tailwind.orchestration.v1.DeepResearchErrorDetail", [4]]]],
-            "generic"
-        ]]]
+        parsed = [
+            [
+                [
+                    "wrb.fr",
+                    "QA9ei",
+                    None,
+                    None,
+                    None,
+                    [
+                        3,
+                        None,
+                        [
+                            [
+                                "type.googleapis.com/google.internal.labs.tailwind.orchestration.v1.DeepResearchErrorDetail",
+                                [4],
+                            ]
+                        ],
+                    ],
+                    "generic",
+                ]
+            ]
+        ]
 
         with pytest.raises(RPCError) as exc_info:
             client._extract_rpc_result(parsed, "QA9ei")
@@ -141,7 +158,7 @@ def test_extract_rpc_result_auth_error_still_works():
     from notebooklm_tools.core.base import BaseClient
     from notebooklm_tools.core.errors import ClientAuthenticationError
 
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="token")
 
         parsed = [[["wrb.fr", "testRpc", None, None, None, [16], "generic"]]]
@@ -155,7 +172,7 @@ def test_extract_rpc_result_unknown_error_code():
     from notebooklm_tools.core.base import BaseClient
     from notebooklm_tools.core.errors import RPCError
 
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="token")
 
         parsed = [[["wrb.fr", "testRpc", None, None, None, [7], "generic"]]]
@@ -169,8 +186,8 @@ def test_extract_rpc_result_unknown_error_code():
 def test_context_manager():
     """Test BaseClient as context manager."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         with BaseClient(cookies={}, csrf_token="token") as client:
             assert client is not None
         # After exiting, client should be closed
@@ -180,8 +197,8 @@ def test_context_manager():
 def test_close():
     """Test explicit close."""
     from notebooklm_tools.core.base import BaseClient
-    
-    with patch.object(BaseClient, '_refresh_auth_tokens'):
+
+    with patch.object(BaseClient, "_refresh_auth_tokens"):
         client = BaseClient(cookies={}, csrf_token="token")
         # Create but don't use _client
         client._client = MagicMock()
@@ -192,19 +209,19 @@ def test_close():
 def test_constants_available():
     """Test that RPC and API constants are available on BaseClient."""
     from notebooklm_tools.core.base import BaseClient
-    
+
     # Check RPC IDs
-    assert hasattr(BaseClient, 'RPC_LIST_NOTEBOOKS')
-    assert hasattr(BaseClient, 'RPC_GET_NOTEBOOK')
-    assert hasattr(BaseClient, 'RPC_CREATE_STUDIO')
-    
+    assert hasattr(BaseClient, "RPC_LIST_NOTEBOOKS")
+    assert hasattr(BaseClient, "RPC_GET_NOTEBOOK")
+    assert hasattr(BaseClient, "RPC_CREATE_STUDIO")
+
     # Check URLs
-    assert hasattr(BaseClient, 'BASE_URL')
-    assert hasattr(BaseClient, 'BATCHEXECUTE_URL')
-    
+    assert hasattr(BaseClient, "BASE_URL")
+    assert hasattr(BaseClient, "BATCHEXECUTE_URL")
+
     # Check constant re-exports
-    assert hasattr(BaseClient, 'STUDIO_TYPE_AUDIO')
-    assert hasattr(BaseClient, 'AUDIO_FORMAT_DEEP_DIVE')
+    assert hasattr(BaseClient, "STUDIO_TYPE_AUDIO")
+    assert hasattr(BaseClient, "AUDIO_FORMAT_DEEP_DIVE")
 
 
 class TestBuildLabelPriority:
@@ -214,9 +231,10 @@ class TestBuildLabelPriority:
         """Extracted build label is used when no env var override."""
         from notebooklm_tools.core.base import BaseClient
 
-        with patch.object(BaseClient, '_refresh_auth_tokens'):
+        with patch.object(BaseClient, "_refresh_auth_tokens"):
             client = BaseClient(
-                cookies={}, csrf_token="token",
+                cookies={},
+                csrf_token="token",
                 build_label="boq_labs-tailwind-frontend_20260219.16_p2",
             )
         url = client._build_url("testRpc")
@@ -224,12 +242,14 @@ class TestBuildLabelPriority:
 
     def test_bl_env_var_overrides_extracted(self):
         """NOTEBOOKLM_BL env var takes precedence over extracted value."""
-        from notebooklm_tools.core.base import BaseClient
         import os
 
-        with patch.object(BaseClient, '_refresh_auth_tokens'):
+        from notebooklm_tools.core.base import BaseClient
+
+        with patch.object(BaseClient, "_refresh_auth_tokens"):
             client = BaseClient(
-                cookies={}, csrf_token="token",
+                cookies={},
+                csrf_token="token",
                 build_label="extracted_value",
             )
         with patch.dict(os.environ, {"NOTEBOOKLM_BL": "env_override_value"}):
@@ -241,7 +261,7 @@ class TestBuildLabelPriority:
         """Falls back to hardcoded default when nothing else is available."""
         from notebooklm_tools.core.base import BaseClient
 
-        with patch.object(BaseClient, '_refresh_auth_tokens'):
+        with patch.object(BaseClient, "_refresh_auth_tokens"):
             client = BaseClient(cookies={}, csrf_token="token")
         url = client._build_url("testRpc")
         assert BaseClient._BL_FALLBACK in url
@@ -250,9 +270,10 @@ class TestBuildLabelPriority:
         """build_label parameter is stored as _bl on the client."""
         from notebooklm_tools.core.base import BaseClient
 
-        with patch.object(BaseClient, '_refresh_auth_tokens'):
+        with patch.object(BaseClient, "_refresh_auth_tokens"):
             client = BaseClient(
-                cookies={}, csrf_token="token",
+                cookies={},
+                csrf_token="token",
                 build_label="test_bl_value",
             )
         assert client._bl == "test_bl_value"

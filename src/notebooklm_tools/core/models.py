@@ -68,7 +68,9 @@ class ChatConfig(BaseModel):
 
     goal: str = Field(default="default", description="Chat goal: default, learning_guide, custom")
     custom_prompt: str | None = Field(default=None, description="Custom prompt when goal=custom")
-    response_length: str = Field(default="default", description="Response length: default, longer, shorter")
+    response_length: str = Field(
+        default="default", description="Response length: default, longer, shorter"
+    )
 
 
 class QueryResponse(BaseModel):

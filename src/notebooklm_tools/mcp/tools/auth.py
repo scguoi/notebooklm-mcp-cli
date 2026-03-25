@@ -4,7 +4,7 @@ import time
 import urllib.parse
 from typing import Any
 
-from ._utils import get_client, reset_client, logged_tool, ESSENTIAL_COOKIES
+from ._utils import ESSENTIAL_COOKIES, get_client, logged_tool, reset_client
 
 
 @logged_tool()
@@ -75,7 +75,7 @@ def save_auth_tokens(
         request_url: Optional - contains session ID if extracting manually
     """
     try:
-        from notebooklm_tools.core.auth import AuthTokens, save_tokens_to_cache, get_cache_path
+        from notebooklm_tools.core.auth import AuthTokens, get_cache_path, save_tokens_to_cache
 
         # Parse cookie string to dict
         all_cookies = {}
@@ -97,16 +97,14 @@ def save_auth_tokens(
         cookie_dict = {k: v for k, v in all_cookies.items() if k in ESSENTIAL_COOKIES}
 
         # Try to extract CSRF token from request body if provided
-        if not csrf_token and request_body:
-            if "at=" in request_body:
-                at_part = request_body.split("at=")[1].split("&")[0]
-                csrf_token = urllib.parse.unquote(at_part)
+        if not csrf_token and request_body and "at=" in request_body:
+            at_part = request_body.split("at=")[1].split("&")[0]
+            csrf_token = urllib.parse.unquote(at_part)
 
         # Try to extract session ID from request URL if provided
-        if not session_id and request_url:
-            if "f.sid=" in request_url:
-                sid_part = request_url.split("f.sid=")[1].split("&")[0]
-                session_id = urllib.parse.unquote(sid_part)
+        if not session_id and request_url and "f.sid=" in request_url:
+            sid_part = request_url.split("f.sid=")[1].split("&")[0]
+            session_id = urllib.parse.unquote(sid_part)
 
         # Try to extract build label from request URL if provided
         build_label = ""

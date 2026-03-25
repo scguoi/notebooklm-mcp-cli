@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 import typer
+
 from notebooklm_tools.cli.utils import make_console
 
 console = make_console()
@@ -19,7 +20,9 @@ app = typer.Typer(
 def doctor(
     ctx: typer.Context,
     verbose: bool = typer.Option(
-        False, "--verbose", "-v",
+        False,
+        "--verbose",
+        "-v",
         help="Show additional diagnostic details",
     ),
 ) -> None:
@@ -62,6 +65,7 @@ def _check_installation(verbose: bool) -> bool:
     # Package version
     try:
         from notebooklm_tools import __version__
+
         console.print(f"  notebooklm-mcp-cli: [green]{__version__}[/green]")
     except ImportError:
         console.print("  notebooklm-mcp-cli: [red]not importable[/red]")
@@ -79,6 +83,7 @@ def _check_installation(verbose: bool) -> bool:
     # Python version
     if verbose:
         import sys
+
         console.print(f"  python: [dim]{sys.executable} ({platform.python_version()})[/dim]")
         console.print(f"  platform: [dim]{platform.system()} {platform.machine()}[/dim]")
 
@@ -121,7 +126,9 @@ def _check_authentication(verbose: bool) -> bool:
                 console.print("  Cookies: [red]missing[/red]")
                 ok = False
 
-            console.print(f"  CSRF token: {'[green]yes[/green]' if has_csrf else '[yellow]no[/yellow] (will auto-extract)'}")
+            console.print(
+                f"  CSRF token: {'[green]yes[/green]' if has_csrf else '[yellow]no[/yellow] (will auto-extract)'}"
+            )
             console.print(f"  Account: {email}")
 
             if verbose:
@@ -231,8 +238,11 @@ def _check_clients(verbose: bool) -> bool:
                 try:
                     result = subprocess.run(
                         [claude_cmd, "mcp", "list"],
-                        capture_output=True, text=True, timeout=5,
-                        encoding="utf-8", errors="replace",
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        encoding="utf-8",
+                        errors="replace",
                     )
                     if result.stdout and "notebooklm" in result.stdout.lower():
                         status = True
@@ -242,7 +252,6 @@ def _check_clients(verbose: bool) -> bool:
                 if verbose:
                     console.print(f"  {info['name']}: [dim]not installed[/dim]")
                 continue
-
 
         elif client_id == "gemini":
             path = _gemini_config_path()
@@ -263,7 +272,9 @@ def _check_clients(verbose: bool) -> bool:
             console.print(f"  {info['name']}: [green]configured[/green]")
             configured_count += 1
         elif status is False:
-            console.print(f"  {info['name']}: [yellow]not configured[/yellow]  → [cyan]nlm setup add {client_id}[/cyan]")
+            console.print(
+                f"  {info['name']}: [yellow]not configured[/yellow]  → [cyan]nlm setup add {client_id}[/cyan]"
+            )
         # None means we couldn't determine (already printed)
 
     if configured_count == 0:
