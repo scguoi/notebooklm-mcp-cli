@@ -91,6 +91,11 @@ def get_client(profile: str | None = None) -> NotebookLMClient:
         # doesn't need to set NOTEBOOKLM_PROJECT_ID / CID manually.
         _inject_enterprise_env(manager)
 
+        # Reset cached variant so it detects enterprise from the injected env vars.
+        from notebooklm_tools.core.variant import reset_variant
+
+        reset_variant()
+
         return NotebookLMClient(
             cookies=p.cookies,
             csrf_token=p.csrf_token or "",

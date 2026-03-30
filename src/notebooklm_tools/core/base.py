@@ -294,9 +294,13 @@ class BaseClient:
         # Request counter for _reqid parameter (required for query endpoint)
         self._reqid_counter = random.randint(100000, 999999)
 
-        # Only refresh CSRF token if not provided - tokens actually last hours/days, not minutes
-        # The retry logic in _call_rpc() handles expired tokens gracefully
-        if not self.csrf_token:
+        # Refresh auth tokens if CSRF is missing, or if enterprise variant
+        # needs a session ID (f.sid). Enterprise RPCs return empty data without it.
+        needs_refresh = not self.csrf_token
+        if not needs_refresh and not self._session_id:
+            v = get_variant()
+            needs_refresh = v.is_enterprise
+        if needs_refresh:
             self._refresh_auth_tokens()
 
     def __enter__(self):

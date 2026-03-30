@@ -82,6 +82,8 @@ def get_client() -> NotebookLMClient:
                 build_label = cached.build_label or ""
                 # Inject enterprise config from profile metadata
                 _inject_enterprise_env_from_profile()
+                from notebooklm_tools.core.variant import reset_variant
+                reset_variant()
             else:
                 raise ValueError(
                     "No authentication found. Either:\n"

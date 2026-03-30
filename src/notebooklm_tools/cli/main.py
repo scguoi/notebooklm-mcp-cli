@@ -2,6 +2,7 @@
 
 import contextlib
 import logging
+import os
 
 import typer
 
@@ -344,7 +345,8 @@ def login_callback(
         email = result.get("email", "")
         build_label = result.get("build_label", "")
 
-        # Save to profile (includes enterprise config if auto-extracted)
+        # Save to profile (includes enterprise config if auto-extracted).
+        # Merge page-extracted values with --url parsed values (env vars) as fallback.
         auth.save_profile(
             cookies=cookies,
             csrf_token=csrf_token,
@@ -352,9 +354,9 @@ def login_callback(
             email=email,
             force=force,
             build_label=build_label,
-            base_url=result.get("base_url"),
-            project_id=result.get("project_id"),
-            cid=result.get("cid"),
+            base_url=result.get("base_url") or os.environ.get("NOTEBOOKLM_BASE_URL"),
+            project_id=result.get("project_id") or os.environ.get("NOTEBOOKLM_PROJECT_ID"),
+            cid=result.get("cid") or os.environ.get("NOTEBOOKLM_CID"),
         )
 
         # Close builtin auth Chrome to release profile lock (enables headless auth later)
