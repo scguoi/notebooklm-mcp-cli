@@ -5,11 +5,7 @@ Use the NotebookLM CLI & MCP Server with **Gemini Enterprise (NotebookLM Pro)** 
 ## Installation
 
 ```bash
-# Install from source (enterprise support is on feat/enterprise-support branch)
-git clone https://github.com/jacob-bd/notebooklm-mcp-cli.git
-cd notebooklm-mcp-cli
-git checkout feat/enterprise-support
-uv tool install .
+uv tool install notebooklm-mcp-cli
 ```
 
 After installation you get two executables:

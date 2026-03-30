@@ -7,11 +7,7 @@
 ## 安装
 
 ```bash
-# 从源码安装（企业版支持在 feat/enterprise-support 分支）
-git clone https://github.com/jacob-bd/notebooklm-mcp-cli.git
-cd notebooklm-mcp-cli
-git checkout feat/enterprise-support
-uv tool install .
+uv tool install notebooklm-mcp-cli
 ```
 
 安装完成后获得两个可执行文件：
