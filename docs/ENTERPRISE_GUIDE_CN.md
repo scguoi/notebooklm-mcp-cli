@@ -23,43 +23,15 @@ uv tool install .
 
 ## 认证配置
 
-### 第一步：获取企业 ID
-
-在 Chrome 中打开企业版 NotebookLM，从 URL 中找到以下信息：
-
-```
-https://vertexaisearch.cloud.google.com/u/0/home/cid/79e69e06-xxxx-xxxx/r/notebook
-                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
-                                                      这是 CID（组织 ID）
-```
-
-点击任意 Notebook 后，iframe URL 中包含 Project ID：
-
-```
-...?project=77341597043&origin=...
-            ^^^^^^^^^^^
-            这是 Project ID
-```
-
-### 第二步：设置环境变量
+只需一条命令，粘贴你的企业版地址即可：
 
 ```bash
-export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
-export NOTEBOOKLM_PROJECT_ID="你的 Project ID"
-export NOTEBOOKLM_CID="你的组织 CID"
+nlm login --url "https://vertexaisearch.cloud.google.com/u/0/home/cid/79e69e06-xxxx-xxxx?hl=en_US"
 ```
 
-> 建议将以上内容写入 `~/.zshrc` 或 `~/.bashrc` 以持久化。
+Chrome 会自动打开企业页面。登录你的 Google Workspace 账户后，所有配置（Cookies、组织 ID、Project ID）自动提取并保存。
 
-### 第三步：登录
-
-```bash
-nlm login
-```
-
-Chrome 会自动打开企业版 Gemini Enterprise 页面。登录你的 Google Workspace 账户后，Cookies 自动提取并保存到本地 profile。
-
-> 登录完成后，后续命令无需再次认证，直到 Cookies 过期。
+> 企业版地址在哪里找？登录 Gemini Enterprise 后，浏览器地址栏的 URL 就是。
 
 ### 验证
 
@@ -67,7 +39,7 @@ Chrome 会自动打开企业版 Gemini Enterprise 页面。登录你的 Google W
 nlm list notebooks
 ```
 
-看到你的 Notebook 列表即为成功。
+看到你的 Notebook 列表即为成功。后续命令无需再次认证，直到 Cookies 过期。过期后重新运行 `nlm login --url ...` 即可。
 
 ## 常用命令
 
@@ -152,15 +124,16 @@ nlm note delete <notebook-id> <note-id> --confirm
 - "创建一个关于机器学习的 Notebook，添加这个 URL 作为来源"
 - "根据 Notebook 内容生成一期播客"
 
-### 手动指定 Cookies（可选）
+### 手动配置（可选）
 
-如果不想用 `nlm login`，也可以手动提供 Cookies 环境变量：
+如果不想用 `nlm login --url`，也可以通过环境变量手动配置：
 
 ```bash
-export NOTEBOOKLM_COOKIES="SID=...; HSID=...; SSID=...; ..."
+export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
+export NOTEBOOKLM_CID="79e69e06-..."        # 组织 ID
+export NOTEBOOKLM_PROJECT_ID="77341597043"  # Project ID
+nlm login                                    # 仍需登录提取 Cookies
 ```
-
-Cookies 必须包含 HttpOnly cookies（`HSID`、`SSID`、`__Secure-1PSID` 等），需要通过 Chrome DevTools Protocol 提取，不能仅用 `document.cookie`。
 
 ## 企业版与标准版差异
 

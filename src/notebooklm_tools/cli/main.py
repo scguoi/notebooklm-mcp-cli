@@ -86,6 +86,36 @@ profile_app = typer.Typer(
 )
 
 
+def _apply_enterprise_url(enterprise_url: str) -> None:
+    """Parse an enterprise URL and set environment variables.
+
+    Accepts URLs like:
+        https://vertexaisearch.cloud.google.com/u/3/home/cid/79e69e06-.../r/notebook?hl=en_US
+
+    Extracts: base_url, CID. Sets NOTEBOOKLM_BASE_URL, NOTEBOOKLM_CID.
+    Also resets the cached variant so it picks up the new base URL.
+    """
+    import os
+    import re
+
+    # Extract base URL (scheme + host)
+    from urllib.parse import urlparse
+
+    parsed = urlparse(enterprise_url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    os.environ["NOTEBOOKLM_BASE_URL"] = base_url
+
+    # Extract CID from path: /u/N/home/cid/<uuid>/...
+    cid_match = re.search(r"/cid/([\w-]{36})", parsed.path)
+    if cid_match:
+        os.environ["NOTEBOOKLM_CID"] = cid_match.group(1)
+
+    # Reset cached variant so it detects enterprise from the new base URL
+    from notebooklm_tools.core.variant import reset_variant
+
+    reset_variant()
+
+
 @login_app.callback(invoke_without_command=True)
 def login_callback(
     ctx: typer.Context,
@@ -132,15 +162,19 @@ def login_callback(
         "--clear",
         help="Delete the localized Chrome profile data before logging in, to switch Google accounts",
     ),
+    url: str | None = typer.Option(
+        None,
+        "--url",
+        help="Enterprise URL (e.g. https://vertexaisearch.cloud.google.com/u/0/home/cid/...). Auto-extracts all enterprise config.",
+    ),
 ) -> None:
     """
     Authenticate with NotebookLM.
 
     Default: Uses Chrome DevTools Protocol to extract cookies automatically.
+    Use --url <enterprise-url> for enterprise/workspace accounts.
     Use --manual to import cookies from a file.
     Use --check to validate existing credentials.
-    Use --provider openclaw --cdp-url <url> to read auth from an existing
-    OpenClaw-managed browser CDP endpoint.
 
     To switch active accounts, run `nlm login switch <profile>`.
     """
@@ -157,6 +191,11 @@ def login_callback(
         profile = get_config().auth.default_profile
 
     auth = AuthManager(profile)
+
+    # Parse enterprise URL if provided — set env vars so variant detection
+    # and Chrome navigation use the correct enterprise endpoints.
+    if url:
+        _apply_enterprise_url(url)
 
     # Show which profile is being authenticated
     if not check and ctx.invoked_subcommand is None:

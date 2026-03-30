@@ -18,41 +18,23 @@ After installation you get two executables:
 
 ## Authentication
 
-### Step 1: Find Your Enterprise IDs
-
-Open Chrome and go to your Gemini Enterprise NotebookLM page. Extract these from the URL:
-
-| Variable | Where to find | Example |
-|----------|--------------|---------|
-| `NOTEBOOKLM_BASE_URL` | Always the same | `https://vertexaisearch.cloud.google.com` |
-| `NOTEBOOKLM_PROJECT_ID` | `project=` in the iframe URL | `77341597043` |
-| `NOTEBOOKLM_CID` | `cid/` in the URL | `79e69e06-91db-410c-8426-98f01f2098ab` |
-
-### Step 2: Set Environment Variables
+One command — paste your enterprise URL:
 
 ```bash
-export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
-export NOTEBOOKLM_PROJECT_ID="<your-project-id>"
-export NOTEBOOKLM_CID="<your-customer-id>"
+nlm login --url "https://vertexaisearch.cloud.google.com/u/0/home/cid/79e69e06-xxxx-xxxx?hl=en_US"
 ```
 
-Add these to your `~/.zshrc` or `~/.bashrc` to persist across sessions.
+Chrome opens the enterprise page automatically. Log in with your Google Workspace account — cookies, org ID, and project ID are all extracted and saved.
 
-### Step 3: Login
-
-```bash
-nlm login
-```
-
-Chrome opens the Gemini Enterprise page automatically. Log in with your Google Workspace account — cookies are extracted and saved to a local profile.
-
-> After login, subsequent commands work without re-authentication until cookies expire.
+> Where to find the URL? It's in your browser address bar after logging into Gemini Enterprise.
 
 ### Verify
 
 ```bash
 nlm list notebooks
 ```
+
+Subsequent commands work without re-authentication until cookies expire. When they do, run `nlm login --url ...` again.
 
 ## CLI Command Reference
 
@@ -127,15 +109,16 @@ Configure in your AI tool's MCP settings:
 
 > The MCP server reads saved cookies from the local profile (created by `nlm login`). No need to include cookies in the config.
 
-### Manual Cookies (Optional)
+### Manual Configuration (Optional)
 
-If you prefer not to use `nlm login`, you can provide cookies via environment variable:
+If you prefer not to use `nlm login --url`, you can set environment variables manually:
 
 ```bash
-export NOTEBOOKLM_COOKIES="SID=...; HSID=...; SSID=...; ..."
+export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
+export NOTEBOOKLM_CID="79e69e06-..."        # Org ID
+export NOTEBOOKLM_PROJECT_ID="77341597043"  # Project ID
+nlm login                                    # Still needed to extract cookies
 ```
-
-Cookies must include HttpOnly cookies (`HSID`, `SSID`, `__Secure-1PSID`, etc.) — extract via Chrome DevTools Protocol, not `document.cookie`.
 
 ## Enterprise vs Standard Differences
 
