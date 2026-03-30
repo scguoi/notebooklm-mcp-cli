@@ -977,7 +977,10 @@ def extract_cookies_from_page(
         "build_label": build_label,
     }
 
-    # Auto-extract enterprise IDs (CID from URL, PROJECT_ID from page)
+    # Auto-extract enterprise IDs and tokens from the NotebookLM iframe.
+    # The Gemini Enterprise shell renders NotebookLM in a child frame with
+    # its own CSRF token, session ID, and project ID — all different from
+    # the outer shell page. We MUST extract from the iframe, not the shell.
     current_url = get_current_url(ws_url)
     if "vertexaisearch.cloud.google.com" in current_url:
         import re as _re
@@ -988,24 +991,49 @@ def extract_cookies_from_page(
         if cid_match:
             result["cid"] = cid_match.group(1)
 
-        # Try to find project_id in current page
-        proj_match = _re.search(r"project=(\d+)", current_url) or _re.search(
-            r"project=(\d+)", html
-        )
-
-        # If not found, navigate to the NotebookLM agent page — the iframe
-        # URL or page HTML will contain project=<id>.
-        if not proj_match:
+        # Navigate to the NotebookLM agent page if not already there
+        if "/r/notebook" not in current_url:
             cid = result.get("cid") or os.environ.get("NOTEBOOKLM_CID", "")
             if cid:
-                nb_agent_url = f"https://vertexaisearch.cloud.google.com/u/0/home/cid/{cid}/r/notebook"
-                navigate_to_url(ws_url, nb_agent_url)
-                time.sleep(3)  # Wait for iframe to load
-                agent_html = get_page_html(ws_url)
-                proj_match = _re.search(r"project=(\d+)", agent_html)
+                navigate_to_url(
+                    ws_url,
+                    f"https://vertexaisearch.cloud.google.com/u/0/home/cid/{cid}/r/notebook",
+                )
+                time.sleep(4)
 
-        if proj_match:
-            result["project_id"] = proj_match.group(1)
+        # Find the NotebookLM iframe via CDP Frame API
+        try:
+            frame_tree = execute_cdp_command(ws_url, "Page.getFrameTree")
+            for child in frame_tree.get("frameTree", {}).get("childFrames", []):
+                frame_url = child.get("frame", {}).get("url", "")
+                if "notebooklm/global" in frame_url:
+                    frame_id = child["frame"]["id"]
+
+                    # Extract project_id from iframe URL
+                    proj_match = _re.search(r"project=(\d+)", frame_url)
+                    if proj_match:
+                        result["project_id"] = proj_match.group(1)
+
+                    # Extract CSRF + session_id from iframe execution context
+                    ctx = execute_cdp_command(ws_url, "Page.createIsolatedWorld", {
+                        "frameId": frame_id,
+                        "worldName": "nlm_extract",
+                    })
+                    eval_res = execute_cdp_command(ws_url, "Runtime.evaluate", {
+                        "expression": "document.documentElement.outerHTML.substring(0, 8000)",
+                        "contextId": ctx["executionContextId"],
+                    })
+                    iframe_html = eval_res.get("result", {}).get("value", "")
+
+                    iframe_csrf = _re.search(r'"SNlM0e":"([^"]+)"', iframe_html)
+                    iframe_sid = _re.search(r'"FdrFJe":"([^"]+)"', iframe_html)
+                    if iframe_csrf:
+                        result["csrf_token"] = iframe_csrf.group(1)
+                    if iframe_sid:
+                        result["session_id"] = iframe_sid.group(1)
+                    break
+        except Exception:
+            pass  # Best-effort — CSRF refresh on first API call will retry
 
     return result
 

@@ -96,11 +96,18 @@ def get_client(profile: str | None = None) -> NotebookLMClient:
 
         reset_variant()
 
+        # For enterprise, don't pass profile's build_label — it's from the
+        # Gemini shell page, not NotebookLM. The variant fallback will be used.
+        from notebooklm_tools.core.variant import get_variant
+
+        v = get_variant()
+        bl = "" if v.is_enterprise else (p.build_label or "")
+
         return NotebookLMClient(
             cookies=p.cookies,
             csrf_token=p.csrf_token or "",
             session_id=p.session_id or "",
-            build_label=p.build_label or "",
+            build_label=bl,
         )
     except typer.Exit:
         raise

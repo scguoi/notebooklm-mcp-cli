@@ -79,11 +79,13 @@ def get_client() -> NotebookLMClient:
                 cookies = cached.cookies
                 csrf_token = csrf_token or cached.csrf_token
                 session_id = session_id or cached.session_id
-                build_label = cached.build_label or ""
                 # Inject enterprise config from profile metadata
                 _inject_enterprise_env_from_profile()
-                from notebooklm_tools.core.variant import reset_variant
+                from notebooklm_tools.core.variant import get_variant, reset_variant
                 reset_variant()
+                # Don't use profile build_label for enterprise (from Gemini shell, not NotebookLM)
+                v = get_variant()
+                build_label = "" if v.is_enterprise else (cached.build_label or "")
             else:
                 raise ValueError(
                     "No authentication found. Either:\n"
