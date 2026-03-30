@@ -240,13 +240,21 @@ class ConversationMixin(BaseClient):
         # Query params structure (from network capture)
         # For new conversations: params[2] = None
         # For follow-ups: params[2] = [[answer, null, 2], [query, null, 1], ...]
-        params = [
+        from .variant import get_variant, notebook_resource, wrap_70000
+
+        v = get_variant()
+
+        params: list[Any] = [
             sources_array,
             query_text,
             conversation_history,  # None for new, history array for follow-ups
             [2, None, [1]],
             conversation_id,
         ]
+
+        # Enterprise adds a 70000 wrapper for notebook context
+        if v.is_enterprise:
+            params.append(wrap_70000(notebook_resource(notebook_id)))
 
         # Use compact JSON format matching Chrome (no spaces)
         params_json = json.dumps(params, separators=(",", ":"), ensure_ascii=False)
@@ -263,16 +271,18 @@ class ConversationMixin(BaseClient):
 
         self._reqid_counter += 100000  # Increment counter
         url_params = {
-            "bl": os.environ.get("NOTEBOOKLM_BL") or getattr(self, "_bl", "") or self._BL_FALLBACK,
+            "bl": os.environ.get("NOTEBOOKLM_BL") or getattr(self, "_bl", "") or v.bl_fallback,
             "hl": os.environ.get("NOTEBOOKLM_HL", "en"),
             "_reqid": str(self._reqid_counter),
             "rt": "c",
         }
         if self._session_id:
             url_params["f.sid"] = self._session_id
+        if v.is_enterprise:
+            url_params["authuser"] = "0"
 
         query_string = urllib.parse.urlencode(url_params)
-        url = f"{self._get_base_url()}{self.QUERY_ENDPOINT}?{query_string}"
+        url = f"{self._get_base_url()}{self._get_query_endpoint()}?{query_string}"
 
         response = client.post(url, content=body, timeout=timeout)
         response.raise_for_status()
@@ -319,21 +329,35 @@ class ConversationMixin(BaseClient):
             return source_ids
 
         try:
-            # Notebook structure: [[notebook_title, sources_array, notebook_id, ...]]
-            # The outer array contains one element with all notebook info
-            # Sources are at position [0][1]
+            # Standard: [[title, sources, id, ...]] — outer array wraps notebook info
+            # Enterprise: [title, sources, id, ...] — flat, no outer wrapper
             if len(notebook_data) > 0 and isinstance(notebook_data[0], list):
-                notebook_info = notebook_data[0]
-                if len(notebook_info) > 1 and isinstance(notebook_info[1], list):
-                    sources = notebook_info[1]
-                    for source in sources:
-                        # Each source: [[source_id], title, metadata, [null, 2]]
-                        if isinstance(source, list) and len(source) > 0:
-                            source_id_wrapper = source[0]
-                            if isinstance(source_id_wrapper, list) and len(source_id_wrapper) > 0:
-                                source_id = source_id_wrapper[0]
-                                if isinstance(source_id, str):
-                                    source_ids.append(source_id)
+                # Could be standard (outer wrapper) or enterprise (sources at [0])
+                # Distinguish: standard[0] is a list with title at [0][0] (string)
+                inner = notebook_data[0]
+                if isinstance(inner, list) and len(inner) > 0 and isinstance(inner[0], str):
+                    # Standard: notebook_data[0] = [title, sources, ...]
+                    notebook_info = inner
+                else:
+                    # Enterprise: notebook_data[0] is title (string), [1] is sources
+                    # Actually if we're here, notebook_data[0] is a list — check [1]
+                    notebook_info = notebook_data
+            elif len(notebook_data) > 0 and isinstance(notebook_data[0], str):
+                # Enterprise: flat [title, sources, id, ...]
+                notebook_info = notebook_data
+            else:
+                return source_ids
+
+            if len(notebook_info) > 1 and isinstance(notebook_info[1], list):
+                sources = notebook_info[1]
+                for source in sources:
+                    # Each source: [[source_id], title, metadata, [null, 2]]
+                    if isinstance(source, list) and len(source) > 0:
+                        source_id_wrapper = source[0]
+                        if isinstance(source_id_wrapper, list) and len(source_id_wrapper) > 0:
+                            source_id = source_id_wrapper[0]
+                            if isinstance(source_id, str):
+                                source_ids.append(source_id)
         except (IndexError, TypeError):
             pass
 

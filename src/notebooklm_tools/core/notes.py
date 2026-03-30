@@ -11,6 +11,7 @@ This mixin provides note-related operations:
 import json
 
 from .base import BaseClient
+from .variant import get_variant, notebook_resource, note_resource, wrap_70000
 
 
 class NotesMixin(BaseClient):
@@ -38,9 +39,13 @@ class NotesMixin(BaseClient):
         if title is None:
             title = "New Note"
 
-        # RPC format: [notebook_id, "", [1], None, title]
-        # Then we need to update it with content using update_note
-        params = [notebook_id, "", [1], None, title]
+        # Enterprise: ["{rp}/notebooks/{nb_id}", [null, "", [1], [], "New Note"]]
+        # Standard:   [notebook_id, "", [1], None, title]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id), [None, "", [1], [], title]]
+        else:
+            params = [notebook_id, "", [1], None, title]
         result = self._call_rpc(self.RPC_CREATE_NOTE, params, f"/notebook/{notebook_id}")
 
         if result and isinstance(result, list) and len(result) > 0:
@@ -81,7 +86,11 @@ class NotesMixin(BaseClient):
             List of note dicts with id, title, content, created_at
         """
         # RPC_GET_NOTES returns both notes and mind maps
-        params = [notebook_id]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id)]
+        else:
+            params = [notebook_id]
         result = self._call_rpc(self.RPC_GET_NOTES, params, f"/notebook/{notebook_id}")
 
         notes = []
@@ -196,12 +205,22 @@ class NotesMixin(BaseClient):
             new_content = content if content is not None else current_note.get("content", "")
             new_title = title if title is not None else current_note.get("title", "")
 
-        # RPC format: [notebook_id, note_id, [[[content, title, [], 0]]]]
-        params = [
-            notebook_id,
-            note_id,
-            [[[new_content, new_title, [], 0]]],
-        ]
+        v = get_variant()
+        if v.is_enterprise:
+            # Enterprise: [[null, "<p>content</p>", null, [], "Title",
+            #   {"70000": "{rp}/notebooks/{nb_id}/notes/{note_id}"}],
+            #   [["content", "title", "saved_response_data"]]]
+            params = [
+                [None, new_content, None, [], new_title,
+                 wrap_70000(note_resource(notebook_id, note_id))],
+                [["content", "title", "saved_response_data"]],
+            ]
+        else:
+            params = [
+                notebook_id,
+                note_id,
+                [[[new_content, new_title, [], 0]]],
+            ]
 
         self._call_rpc(self.RPC_UPDATE_NOTE, params, f"/notebook/{notebook_id}")
 
@@ -223,8 +242,14 @@ class NotesMixin(BaseClient):
         Returns:
             True on success, False on failure
         """
-        # RPC format: [notebook_id, None, [note_id]]
-        params = [notebook_id, None, [note_id]]
+        v = get_variant()
+        if v.is_enterprise:
+            # Enterprise: ["{rp}/notebooks/{nb_id}", [note_resource], [note_id]]
+            nb_res = notebook_resource(notebook_id)
+            n_res = note_resource(notebook_id, note_id)
+            params = [nb_res, [n_res], [note_id]]
+        else:
+            params = [notebook_id, None, [note_id]]
         self._call_rpc(self.RPC_DELETE_NOTE, params, f"/notebook/{notebook_id}")
 
         # Returns null on success (soft-delete: clears content, keeps ID)

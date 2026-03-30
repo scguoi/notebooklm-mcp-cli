@@ -18,6 +18,8 @@ from typing import Any
 
 import httpx
 
+from notebooklm_tools.utils.config import get_base_url
+
 from . import constants
 from .data_types import ConversationTurn
 from .errors import ClientAuthenticationError as AuthenticationError
@@ -29,7 +31,7 @@ from .utils import (
     _format_debug_json,
     _parse_url_params,
 )
-from notebooklm_tools.utils.config import get_base_url
+from .variant import get_variant, translate_rpc_id
 
 # Configure logger (API internals only logged at DEBUG level, usually disabled)
 logger = logging.getLogger("notebooklm_mcp.api")
@@ -59,11 +61,16 @@ class BaseClient:
 
     @classmethod
     def _get_batchexecute_url(cls) -> str:
-        return f"{cls._get_base_url()}/_/LabsTailwindUi/data/batchexecute"
+        v = get_variant()
+        return f"{v.base_url}{v.batchexecute_path}"
 
     @classmethod
     def _get_upload_url(cls) -> str:
         return f"{cls._get_base_url()}/upload/_/"
+
+    @classmethod
+    def _get_query_endpoint(cls) -> str:
+        return get_variant().query_endpoint
 
     # Keep class-level attributes for backward compatibility with code that
     # reads them directly (e.g. tests). These are the defaults; runtime code
@@ -420,17 +427,33 @@ class BaseClient:
         return "&".join(body_parts) + "&"
 
     def _build_url(self, rpc_id: str, source_path: str = "/") -> str:
-        """Build the batchexecute URL with query params."""
+        """Build the batchexecute URL with query params.
+
+        For enterprise variants, source_path is automatically prefixed with
+        the variant's path_prefix (e.g. /notebooklm/global/).
+        """
+        v = get_variant()
+
+        # Auto-prefix source_path for enterprise:
+        # "/" becomes the variant prefix, "/notebook/..." gets the prefix prepended
+        if source_path == "/":
+            source_path = v.path_prefix
+        elif v.path_prefix != "/" and not source_path.startswith(v.path_prefix):
+            source_path = f"{v.path_prefix.rstrip('/')}{source_path}"
+
         params = {
             "rpcids": rpc_id,
             "source-path": source_path,
-            "bl": os.environ.get("NOTEBOOKLM_BL") or getattr(self, "_bl", "") or self._BL_FALLBACK,
+            "bl": os.environ.get("NOTEBOOKLM_BL") or getattr(self, "_bl", "") or v.bl_fallback,
             "hl": os.environ.get("NOTEBOOKLM_HL", "en"),
             "rt": "c",
         }
 
         if self._session_id:
             params["f.sid"] = self._session_id
+
+        if v.is_enterprise:
+            params["authuser"] = "0"
 
         query = urllib.parse.urlencode(params)
         return f"{self._get_batchexecute_url()}?{query}"
@@ -551,14 +574,16 @@ class BaseClient:
         3. Run headless auth (auto-refresh if Chrome profile has saved login)
         """
         client = self._get_client()
-        body = self._build_request_body(rpc_id, params)
-        url = self._build_url(rpc_id, path)
+        wire_rpc_id = translate_rpc_id(rpc_id)
+        body = self._build_request_body(wire_rpc_id, params)
+        url = self._build_url(wire_rpc_id, path)
 
         # Enhanced debug logging
         if logger.isEnabledFor(logging.DEBUG):
             method_name = RPC_NAMES.get(rpc_id, "unknown")
+            rpc_label = f"{wire_rpc_id}" if wire_rpc_id == rpc_id else f"{wire_rpc_id} (std: {rpc_id})"
             logger.debug("=" * 70)
-            logger.debug(f"RPC Call: {rpc_id} ({method_name})")
+            logger.debug(f"RPC Call: {rpc_label} ({method_name})")
             logger.debug("-" * 70)
 
             # Parse and display URL params
@@ -598,7 +623,7 @@ class BaseClient:
 
             # Check for RPC-level errors (soft auth failure)
             parsed = self._parse_response(response.text)
-            result = self._extract_rpc_result(parsed, rpc_id)
+            result = self._extract_rpc_result(parsed, wire_rpc_id)
 
             # Enhanced debug logging for extracted result
             if logger.isEnabledFor(logging.DEBUG):
@@ -652,18 +677,30 @@ class BaseClient:
 
         # Layer 1: Refresh CSRF/session tokens (first retry only)
         if not _retry:
+            saved_sid = self._session_id
             try:
                 self._refresh_auth_tokens()
+                # Restore session_id if refresh didn't extract a new one
+                if not self._session_id and saved_sid:
+                    self._session_id = saved_sid
                 self._client = None
                 return self._call_rpc(rpc_id, params, path, timeout, _retry=True)
             except ValueError:
                 # CSRF refresh failed (cookies expired) - continue to layer 2
-                pass
+                if not self._session_id and saved_sid:
+                    self._session_id = saved_sid
 
         # Layer 2 & 3: Reload from disk or run headless auth (deep retry)
-        if not _deep_retry and self._try_reload_or_headless_auth():
-            self._client = None
-            return self._call_rpc(rpc_id, params, path, timeout, _retry=True, _deep_retry=True)
+        # Skip disk/headless recovery for env-var auth (e.g. enterprise via
+        # NOTEBOOKLM_COOKIES). Disk cache likely holds a different profile's
+        # tokens and would corrupt the current session.
+        if not _deep_retry and not os.environ.get("NOTEBOOKLM_COOKIES"):
+            saved_sid = self._session_id
+            if self._try_reload_or_headless_auth():
+                if not self._session_id and saved_sid:
+                    self._session_id = saved_sid
+                self._client = None
+                return self._call_rpc(rpc_id, params, path, timeout, _retry=True, _deep_retry=True)
 
         # All recovery attempts failed
         raise AuthenticationError(
@@ -694,7 +731,8 @@ class BaseClient:
         with httpx.Client(
             cookies=cookies, headers=headers, follow_redirects=True, timeout=15.0
         ) as client:
-            response = client.get(f"{self._get_base_url()}/")
+            v = get_variant()
+            response = client.get(f"{self._get_base_url()}{v.auth_page_path}")
 
             # Check if redirected to login (cookies expired)
             if "accounts.google.com" in str(response.url):
@@ -738,8 +776,50 @@ class BaseClient:
             if bl_match:
                 self._bl = bl_match.group(1)
 
+            # Extract project ID for enterprise (used by Discovery Engine upload)
+            if v.is_enterprise:
+                proj_match = re.search(r"project=(\d+)", html)
+                if proj_match:
+                    self._project_id = proj_match.group(1)
+
+            # Sync rotated cookies from the page fetch response.
+            # The server may rotate cookies (SIDCC, __Secure-*PSIDCC, etc.)
+            # via Set-Cookie headers. The CSRF token we just extracted is bound
+            # to these rotated cookies, so we must update our stored cookies to
+            # match, otherwise the next API call will fail with RPC error 16.
+            self._sync_rotated_cookies(client)
+
             # Cache the extracted tokens to avoid re-fetching the page on next request
             self._update_cached_tokens()
+
+    def _sync_rotated_cookies(self, client: httpx.Client) -> None:
+        """Sync rotated cookies from a page fetch response back to stored cookies.
+
+        After fetching a page, the server may rotate cookies via Set-Cookie
+        headers (e.g. SIDCC, __Secure-*PSIDCC). The CSRF token extracted from
+        that page is bound to these rotated values, so our stored cookies must
+        be updated to match.
+
+        Rebuilds the cookie list from the httpx jar to capture all rotated values
+        with their correct domains.
+        """
+        try:
+            jar_cookies: list[dict[str, str]] = []
+            for cookie in client.cookies.jar:
+                jar_cookies.append({
+                    "name": cookie.name,
+                    "value": cookie.value,
+                    "domain": cookie.domain or ".google.com",
+                    "path": cookie.path or "/",
+                })
+
+            if not jar_cookies:
+                return
+
+            # Replace cookies entirely with the post-rotation jar
+            self.cookies = jar_cookies
+        except Exception:
+            pass  # Non-critical — best-effort sync
 
     def _update_cached_tokens(self) -> None:
         """Update the cached auth tokens with newly extracted CSRF token and session ID.

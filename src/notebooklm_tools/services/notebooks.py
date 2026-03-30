@@ -3,8 +3,13 @@
 from typing import TypedDict
 
 from ..core.client import NotebookLMClient
-from ..utils.config import get_base_url
+from ..core.variant import get_variant
 from .errors import CreationError, NotFoundError, ServiceError, ValidationError
+
+
+def _notebook_url(notebook_id: str) -> str:
+    v = get_variant()
+    return f"{v.base_url}{v.path_prefix}notebook/{notebook_id}"
 
 
 class NotebookInfo(TypedDict):
@@ -174,7 +179,7 @@ def get_notebook(
                 "notebook_id": nb_id,
                 "title": title,
                 "source_count": len(sources),
-                "url": f"{get_base_url()}/notebook/{nb_id}",
+                "url": _notebook_url(nb_id),
                 "sources": sources,
             }
 
@@ -184,7 +189,7 @@ def get_notebook(
             "notebook_id": nb.id,
             "title": getattr(nb, "title", "Untitled"),
             "source_count": getattr(nb, "source_count", 0),
-            "url": getattr(nb, "url", f"{get_base_url()}/notebook/{nb.id}"),
+            "url": getattr(nb, "url", _notebook_url(nb.id)),
             "sources": [],
         }
 

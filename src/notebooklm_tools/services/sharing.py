@@ -115,8 +115,17 @@ def set_public_access(
         PublicAccessResult with link info
 
     Raises:
+        ValidationError: If public sharing is not available (enterprise)
         ServiceError: If the API call fails
     """
+    from notebooklm_tools.core.variant import get_variant
+
+    if get_variant().is_enterprise and is_public:
+        raise ValidationError(
+            "Public link sharing is not available in NotebookLM Enterprise. "
+            "Use invite-based sharing instead."
+        )
+
     try:
         result = client.set_public_access(notebook_id, is_public)
         if is_public:

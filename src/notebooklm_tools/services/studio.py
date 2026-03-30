@@ -104,13 +104,26 @@ class ReviseResult(TypedDict):
 def validate_artifact_type(artifact_type: str) -> None:
     """Validate that artifact_type is one of the supported types.
 
+    Also checks enterprise feature gating — some types are not available
+    in Gemini Enterprise (NotebookLM Pro).
+
     Raises:
-        ValidationError: If artifact_type is invalid
+        ValidationError: If artifact_type is invalid or unsupported in current variant
     """
     if artifact_type not in VALID_ARTIFACT_TYPES:
         raise ValidationError(
             f"Unknown artifact type '{artifact_type}'. "
             f"Valid types: {', '.join(sorted(VALID_ARTIFACT_TYPES))}",
+        )
+
+    from notebooklm_tools.core.variant import get_variant
+
+    v = get_variant()
+    if artifact_type in v.unsupported_studio_types:
+        supported = sorted(VALID_ARTIFACT_TYPES - v.unsupported_studio_types)
+        raise ValidationError(
+            f"'{artifact_type}' is not available in NotebookLM Enterprise. "
+            f"Supported types: {', '.join(supported)}",
         )
 
 

@@ -7,6 +7,7 @@ operations (web search, Drive search, and source discovery).
 
 from . import constants
 from .base import BaseClient
+from .variant import get_variant, notebook_resource, translate_rpc_id, wrap_70000
 
 
 class ResearchMixin(BaseClient):
@@ -58,14 +59,21 @@ class ResearchMixin(BaseClient):
             self.RESEARCH_SOURCE_WEB if source_lower == "web" else self.RESEARCH_SOURCE_DRIVE
         )
 
+        v = get_variant()
+
         if mode_lower == "fast":
-            # Fast Research: Ljjv0c
-            params = [[query, source_type], None, 1, notebook_id]
             rpc_id = self.RPC_START_FAST_RESEARCH
+            if v.is_enterprise:
+                # Enterprise: [[query, source_type], null, 1, "{nb_id}", {"70000": "{rp}/notebooks/{nb_id}"}]
+                params = [
+                    [query, source_type], None, 1, notebook_id,
+                    wrap_70000(notebook_resource(notebook_id)),
+                ]
+            else:
+                params = [[query, source_type], None, 1, notebook_id]
         else:
-            # Deep Research: QA9ei
-            params = [None, [1], [query, source_type], 5, notebook_id]
             rpc_id = self.RPC_START_DEEP_RESEARCH
+            params = [None, [1], [query, source_type], 5, notebook_id]
 
         result = self._call_rpc(rpc_id, params, path=f"/notebook/{notebook_id}")
 
@@ -104,14 +112,16 @@ class ResearchMixin(BaseClient):
 
         # Poll params: [null, null, "notebook_id"]
         params = [None, None, notebook_id]
-        body = self._build_request_body(self.RPC_POLL_RESEARCH, params)
-        url = self._build_url(self.RPC_POLL_RESEARCH, f"/notebook/{notebook_id}")
+
+        wire_id = translate_rpc_id(self.RPC_POLL_RESEARCH)
+        body = self._build_request_body(wire_id, params)
+        url = self._build_url(wire_id, f"/notebook/{notebook_id}")
 
         response = client.post(url, content=body)
         response.raise_for_status()
 
         parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_POLL_RESEARCH)
+        result = self._extract_rpc_result(parsed, wire_id)
 
         if not result or not isinstance(result, list) or len(result) == 0:
             return {"status": "no_research", "message": "No active research found"}
@@ -373,15 +383,23 @@ class ResearchMixin(BaseClient):
 
             source_array.append(source_data)
 
-        params = [None, [1], task_id, notebook_id, source_array]
-        body = self._build_request_body(self.RPC_IMPORT_RESEARCH, params)
-        url = self._build_url(self.RPC_IMPORT_RESEARCH, f"/notebook/{notebook_id}")
+        v = get_variant()
+        if v.is_enterprise:
+            # Enterprise import uses same RPC as add_source (kqBlec)
+            # Wrap source data with last flag = 2 (research import)
+            params = [notebook_resource(notebook_id), [source_array]]
+        else:
+            params = [None, [1], task_id, notebook_id, source_array]
+
+        wire_id = translate_rpc_id(self.RPC_IMPORT_RESEARCH)
+        body = self._build_request_body(wire_id, params)
+        url = self._build_url(wire_id, f"/notebook/{notebook_id}")
 
         response = client.post(url, content=body, timeout=timeout)
         response.raise_for_status()
 
         parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_IMPORT_RESEARCH)
+        result = self._extract_rpc_result(parsed, wire_id)
 
         imported_sources = []
         if result and isinstance(result, list):

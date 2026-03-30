@@ -5,8 +5,10 @@ import urllib.parse
 from datetime import UTC, datetime
 from typing import Any
 
-# RPC ID to method name mapping for debug logging
+# RPC ID to method name mapping for debug logging.
+# Includes both standard and enterprise RPC IDs.
 RPC_NAMES = {
+    # Standard RPC IDs
     "wXbhsf": "list_notebooks",
     "rLM1Ne": "get_notebook",
     "CCqFvf": "create_notebook",
@@ -40,6 +42,27 @@ RPC_NAMES = {
     "QDyure": "share_notebook",
     "JFMDGd": "get_share_status",
     "KmcKPe": "revise_slide_deck",
+    # Enterprise RPC IDs
+    "y2DRud": "account_settings",
+    "rG2vCb": "list_notebooks",
+    "tHcQ6c": "get_notebook",
+    "AzXHBd": "create_notebook",
+    "aja7m": "rename_notebook/chat_configure",
+    "J0zsyb": "delete_notebook",
+    "kqBlec": "add_source/import_research",
+    "GcP14b": "get_source",
+    "DaIlK": "rename_source",
+    "iMJYGb": "delete_source",
+    "aNc62": "create_studio",
+    "IU9Pxb": "generate_mind_map",
+    "YoTKpc": "save_mind_map/create_note",
+    "a0XDpc": "poll_studio",
+    "LmGGPd": "get_summary/list_notes",
+    "ZMz0Qe": "delete_artifact/delete_note",
+    "bpv8Yd": "update_note",
+    "LJ9a9c": "get_share_status",
+    "ugXkff": "share_invite",
+    "YHCHrc": "research_start",
 }
 
 

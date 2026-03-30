@@ -12,7 +12,7 @@
 
 **Programmatic access to Google NotebookLM** — via command-line interface (CLI) or Model Context Protocol (MCP) server.
 
-> **Note:** Tested with Pro/free tier accounts. May work with NotebookLM Enterprise accounts but has not been tested.
+> **Enterprise Support:** Full support for **Gemini Enterprise (NotebookLM Pro)** at `vertexaisearch.cloud.google.com`. See the [Enterprise Guide](docs/ENTERPRISE_GUIDE.md) ([中文版](docs/ENTERPRISE_GUIDE_CN.md)) for setup instructions. Also works with personal/free tier and Plus accounts.
 
 📺 **Watch the Demos**
 

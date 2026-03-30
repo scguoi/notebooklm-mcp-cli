@@ -6,6 +6,14 @@ import contextlib
 from . import constants
 from .base import BaseClient
 from .utils import parse_timestamp
+from .variant import (
+    get_variant,
+    notebook_resource,
+    note_resource,
+    resource_prefix,
+    translate_rpc_id,
+    wrap_70000,
+)
 
 
 class StudioMixin(BaseClient):
@@ -26,6 +34,31 @@ class StudioMixin(BaseClient):
     # =========================================================================
     # Helper Methods
     # =========================================================================
+
+    def _studio_rpc(
+        self, rpc_id: str, params: list, notebook_id: str, path: str | None = None
+    ) -> dict | list | None:
+        """Execute a studio RPC with automatic enterprise adaptation.
+
+        Handles RPC ID translation, enterprise 70000 wrapper, and result extraction.
+        Keeps the boilerplate DRY for all studio create/poll/generate methods.
+        """
+        wire_id = translate_rpc_id(rpc_id)
+
+        v = get_variant()
+        if v.is_enterprise:
+            params = [*params, wrap_70000(notebook_resource(notebook_id))]
+
+        rpc_path = path or f"/notebook/{notebook_id}"
+        body = self._build_request_body(wire_id, params)
+        url = self._build_url(wire_id, rpc_path)
+
+        client = self._get_client()
+        response = client.post(url, content=body)
+        response.raise_for_status()
+
+        parsed = self._parse_response(response.text)
+        return self._extract_rpc_result(parsed, wire_id)
 
     def _get_all_source_ids(self, notebook_id: str) -> list[str]:
         """Get all source IDs from a notebook.
@@ -87,17 +120,11 @@ class StudioMixin(BaseClient):
             [None, None, self.STUDIO_TYPE_AUDIO, sources_nested, None, None, audio_options],
         ]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -181,17 +208,11 @@ class StudioMixin(BaseClient):
             ],
         ]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -225,16 +246,12 @@ class StudioMixin(BaseClient):
         """Poll for studio content (audio/video overviews) status."""
         client = self._get_client()
 
-        # Poll params: [[2], notebook_id, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"']
-        params = [[2], notebook_id, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"']
-        body = self._build_request_body(self.RPC_POLL_STUDIO, params)
-        url = self._build_url(self.RPC_POLL_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_POLL_STUDIO)
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id)]
+        else:
+            params = [[2], notebook_id, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"']
+        result = self._studio_rpc(self.RPC_POLL_STUDIO, params, notebook_id)
 
         artifacts = []
         if result and isinstance(result, list) and len(result) > 0:
@@ -450,18 +467,23 @@ class StudioMixin(BaseClient):
         Returns:
             True on success, False on failure
         """
+        v = get_variant()
+
         # 1. Try standard deletion (Audio, Video, etc.)
         try:
-            params = [[2], artifact_id]
+            if v.is_enterprise and notebook_id:
+                nb_res = notebook_resource(notebook_id)
+                art_res = note_resource(notebook_id, artifact_id)
+                params = [nb_res, [art_res], [artifact_id]]
+            else:
+                params = [[2], artifact_id]
             result = self._call_rpc(self.RPC_DELETE_STUDIO, params)
             if result is not None:
                 return True
         except Exception:
-            # Continue to fallback if standard delete fails
             pass
 
         # 2. Fallback: Try Mind Map deletion if we have a notebook ID
-        # Mind maps require a different RPC (AH0mwd) and payload structure
         if notebook_id:
             return self.delete_mind_map(notebook_id, artifact_id)
 
@@ -477,8 +499,13 @@ class StudioMixin(BaseClient):
         Returns:
             True on success
         """
+        v = get_variant()
+
         # 1. We need the artifact-specific timestamp from LIST_MIND_MAPS
-        params = [notebook_id]
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id)]
+        else:
+            params = [notebook_id]
         list_result = self._call_rpc(self.RPC_LIST_MIND_MAPS, params, f"/notebook/{notebook_id}")
 
         timestamp = None
@@ -491,14 +518,21 @@ class StudioMixin(BaseClient):
                         timestamp = mm_entry[1][2][2]
                     break
 
-        # 2. Step 1: UUID-based deletion (AH0mwd)
-        params_v2 = [notebook_id, None, [mind_map_id], [2]]
+        # 2. Step 1: UUID-based deletion (AH0mwd / ZMz0Qe)
+        if v.is_enterprise:
+            nb_res = notebook_resource(notebook_id)
+            note_res = note_resource(notebook_id, mind_map_id)
+            params_v2 = [nb_res, [note_res], [mind_map_id]]
+        else:
+            params_v2 = [notebook_id, None, [mind_map_id], [2]]
         self._call_rpc(self.RPC_DELETE_MIND_MAP, params_v2, f"/notebook/{notebook_id}")
 
-        # 3. Step 2: Timestamp-based sync/deletion (cFji9)
-        # This is required to fully remove it from the list and avoid "ghosts"
+        # 3. Step 2: Timestamp-based sync/deletion (cFji9 / LmGGPd)
         if timestamp:
-            params_v1 = [notebook_id, None, timestamp, [2]]
+            if v.is_enterprise:
+                params_v1 = [notebook_resource(notebook_id), None, timestamp, [2]]
+            else:
+                params_v1 = [notebook_id, None, timestamp, [2]]
             self._call_rpc(self.RPC_LIST_MIND_MAPS, params_v1, f"/notebook/{notebook_id}")
 
         return True
@@ -628,17 +662,11 @@ class StudioMixin(BaseClient):
 
         params = [[2], notebook_id, content]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -716,17 +744,11 @@ class StudioMixin(BaseClient):
 
         params = [[2], notebook_id, content]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -853,17 +875,11 @@ class StudioMixin(BaseClient):
 
         params = [[2], notebook_id, content]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -944,17 +960,11 @@ class StudioMixin(BaseClient):
 
         params = [[2], notebook_id, content]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -1040,17 +1050,11 @@ class StudioMixin(BaseClient):
 
         params = [[2], notebook_id, content]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -1132,17 +1136,11 @@ class StudioMixin(BaseClient):
 
         params = [[2], notebook_id, content]
 
-        body = self._build_request_body(self.RPC_CREATE_STUDIO, params)
-        url = self._build_url(self.RPC_CREATE_STUDIO, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_CREATE_STUDIO)
+        result = self._studio_rpc(self.RPC_CREATE_STUDIO, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
-            artifact_data = result[0]
+            # Enterprise returns flat [id, title, ...], standard wraps [[id, title, ...]]
+            artifact_data = result[0] if isinstance(result[0], list) else result
             artifact_id = (
                 artifact_data[0]
                 if isinstance(artifact_data, list) and len(artifact_data) > 0
@@ -1222,14 +1220,7 @@ class StudioMixin(BaseClient):
             [2, None, [1]],
         ]
 
-        body = self._build_request_body(self.RPC_GENERATE_MIND_MAP, params)
-        url = self._build_url(self.RPC_GENERATE_MIND_MAP)
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_GENERATE_MIND_MAP)
+        result = self._studio_rpc(self.RPC_GENERATE_MIND_MAP, params, notebook_id, path="/")
 
         if result and isinstance(result, list) and len(result) > 0:
             # Response is nested: [[json_string, null, [gen_ids]]]
@@ -1288,16 +1279,16 @@ class StudioMixin(BaseClient):
 
         metadata = [2, None, None, 5, sources_simple]
 
-        params = [notebook_id, mind_map_json, metadata, None, title]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [
+                notebook_resource(notebook_id),
+                [None, mind_map_json, metadata, [], title],
+            ]
+        else:
+            params = [notebook_id, mind_map_json, metadata, None, title]
 
-        body = self._build_request_body(self.RPC_SAVE_MIND_MAP, params)
-        url = self._build_url(self.RPC_SAVE_MIND_MAP, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_SAVE_MIND_MAP)
+        result = self._studio_rpc(self.RPC_SAVE_MIND_MAP, params, notebook_id)
 
         if result and isinstance(result, list) and len(result) > 0:
             # Response is nested: [[mind_map_id, json, metadata, null, title]]
@@ -1318,18 +1309,13 @@ class StudioMixin(BaseClient):
 
     def list_mind_maps(self, notebook_id: str) -> list[dict]:
         """List all Mind Maps in a notebook."""
-        client = self._get_client()
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id)]
+        else:
+            params = [notebook_id]
 
-        params = [notebook_id]
-
-        body = self._build_request_body(self.RPC_LIST_MIND_MAPS, params)
-        url = self._build_url(self.RPC_LIST_MIND_MAPS, f"/notebook/{notebook_id}")
-
-        response = client.post(url, content=body)
-        response.raise_for_status()
-
-        parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_LIST_MIND_MAPS)
+        result = self._studio_rpc(self.RPC_LIST_MIND_MAPS, params, notebook_id)
 
         mind_maps = []
         if result and isinstance(result, list) and len(result) > 0:
