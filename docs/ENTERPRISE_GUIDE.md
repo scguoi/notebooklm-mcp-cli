@@ -18,55 +18,35 @@ After installation you get two executables:
 
 ## Authentication
 
-Enterprise authentication requires three environment variables and cookies from your browser.
-
 ### Step 1: Find Your Enterprise IDs
 
-1. Open Chrome and go to your Gemini Enterprise NotebookLM page
-2. The URL looks like: `https://vertexaisearch.cloud.google.com/u/0/home/cid/<CID>/r/notebook`
-3. Click any notebook — the URL parameters contain your **project ID** (`project=XXXXX`)
+Open Chrome and go to your Gemini Enterprise NotebookLM page. Extract these from the URL:
 
 | Variable | Where to find | Example |
 |----------|--------------|---------|
 | `NOTEBOOKLM_BASE_URL` | Always the same | `https://vertexaisearch.cloud.google.com` |
-| `NOTEBOOKLM_PROJECT_ID` | `project=` in the URL | `77341597043` |
+| `NOTEBOOKLM_PROJECT_ID` | `project=` in the iframe URL | `77341597043` |
 | `NOTEBOOKLM_CID` | `cid/` in the URL | `79e69e06-91db-410c-8426-98f01f2098ab` |
 
-### Step 2: Extract Cookies
-
-Cookies must include HttpOnly cookies (`HSID`, `SSID`, `__Secure-1PSID`, etc.), so you need Chrome DevTools Protocol (CDP) extraction — not just `document.cookie`.
-
-**Option A: Via Chrome with remote debugging**
-
-```bash
-# Launch Chrome with debugging enabled
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 \
-  --user-data-dir="$HOME/.notebooklm-mcp-cli/chrome-profile" &
-
-# Log in to Gemini Enterprise in the opened Chrome window
-# Then extract cookies:
-python3 -c "
-from notebooklm_tools.utils.cdp import extract_cookies_from_page
-result = extract_cookies_from_page(cdp_http_url='http://localhost:9222')
-cookies = result.get('cookies', [])
-gc = [c for c in cookies if c.get('domain','') == '.google.com']
-print('; '.join(f'{c[\"name\"]}={c[\"value\"]}' for c in gc))
-"
-```
-
-**Option B: Via MCP (if using Playwright MCP or Chrome DevTools MCP)**
-
-Use the `save_auth_tokens` MCP tool to save cookies directly from the browser.
-
-### Step 3: Set Environment Variables
+### Step 2: Set Environment Variables
 
 ```bash
 export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
 export NOTEBOOKLM_PROJECT_ID="<your-project-id>"
 export NOTEBOOKLM_CID="<your-customer-id>"
-export NOTEBOOKLM_COOKIES="<full-cookie-string>"
 ```
+
+Add these to your `~/.zshrc` or `~/.bashrc` to persist across sessions.
+
+### Step 3: Login
+
+```bash
+nlm login
+```
+
+Chrome opens the Gemini Enterprise page automatically. Log in with your Google Workspace account — cookies are extracted and saved to a local profile.
+
+> After login, subsequent commands work without re-authentication until cookies expire.
 
 ### Verify
 
@@ -79,95 +59,56 @@ nlm list notebooks
 ### Notebooks
 
 ```bash
-# List all notebooks
-nlm list notebooks
-
-# Create a notebook
-nlm create notebook "My Research"
-
-# Get notebook details
-nlm get notebook <notebook-id>
-
-# Get AI-generated summary
-nlm describe notebook <notebook-id>
-
-# Rename a notebook
-nlm rename notebook <notebook-id> "New Title"
-
-# Delete a notebook (irreversible)
-nlm delete notebook <notebook-id> --confirm
+nlm list notebooks                         # List all notebooks
+nlm create notebook "My Research"          # Create a notebook
+nlm get notebook <id>                       # Get notebook details
+nlm describe notebook <id>                  # AI-generated summary
+nlm rename notebook <id> "New Title"       # Rename
+nlm delete notebook <id> --confirm          # Delete (irreversible)
 ```
 
 ### Sources
 
 ```bash
-# List sources in a notebook
-nlm list sources <notebook-id>
-
-# Add a URL source
-nlm add url <notebook-id> "https://example.com/article"
-
-# Add text source
-nlm add text <notebook-id> "Your text content" --title "Source Title"
-
-# Rename a source
-nlm rename source -n <notebook-id> <source-id> "New Name"
-
-# Delete a source (irreversible)
-nlm delete source <source-id> --confirm
+nlm list sources <notebook-id>                              # List sources
+nlm add url <notebook-id> "https://example.com/article"     # Add URL
+nlm add text <notebook-id> "Content" --title "Title"        # Add text
+nlm rename source -n <notebook-id> <source-id> "New Name"  # Rename
+nlm delete source <source-id> --confirm                     # Delete
 ```
 
 ### Chat / Query
 
 ```bash
-# Ask a question about notebook contents
 nlm chat send <notebook-id> "What are the key findings?"
 ```
 
 ### Studio Content
 
 ```bash
-# Create audio overview (podcast)
-nlm studio create <notebook-id> audio --confirm
-
-# Check generation status
-nlm studio status <notebook-id>
+nlm studio create <notebook-id> audio --confirm    # Create podcast
+nlm studio status <notebook-id>                    # Check status
 ```
 
 ### Sharing
 
 ```bash
-# View sharing status
-nlm share status <notebook-id>
-
-# Invite a collaborator (enterprise uses invite-only, no public links)
-nlm share invite <notebook-id> user@example.com
+nlm share status <notebook-id>                           # View status
+nlm share invite <notebook-id> user@example.com          # Invite collaborator
 ```
+
+> Enterprise does not support public link sharing — invite-only.
 
 ### Notes
 
 ```bash
-# Create a note
-nlm note create <notebook-id> --title "My Note" --content "Note content"
-
-# Delete a note
+nlm note create <notebook-id> --title "My Note" --content "Content"
 nlm note delete <notebook-id> <note-id> --confirm
 ```
 
-## MCP Server Usage
+## MCP Server Configuration
 
-Start the MCP server with enterprise environment variables:
-
-```bash
-export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
-export NOTEBOOKLM_PROJECT_ID="<your-project-id>"
-export NOTEBOOKLM_CID="<your-customer-id>"
-export NOTEBOOKLM_COOKIES="<cookies>"
-
-notebooklm-mcp
-```
-
-Or configure in your AI tool's MCP settings (e.g. `.claude/claude_desktop_config.json`):
+Configure in your AI tool's MCP settings:
 
 ```json
 {
@@ -177,13 +118,24 @@ Or configure in your AI tool's MCP settings (e.g. `.claude/claude_desktop_config
       "env": {
         "NOTEBOOKLM_BASE_URL": "https://vertexaisearch.cloud.google.com",
         "NOTEBOOKLM_PROJECT_ID": "<your-project-id>",
-        "NOTEBOOKLM_CID": "<your-customer-id>",
-        "NOTEBOOKLM_COOKIES": "<cookies>"
+        "NOTEBOOKLM_CID": "<your-customer-id>"
       }
     }
   }
 }
 ```
+
+> The MCP server reads saved cookies from the local profile (created by `nlm login`). No need to include cookies in the config.
+
+### Manual Cookies (Optional)
+
+If you prefer not to use `nlm login`, you can provide cookies via environment variable:
+
+```bash
+export NOTEBOOKLM_COOKIES="SID=...; HSID=...; SSID=...; ..."
+```
+
+Cookies must include HttpOnly cookies (`HSID`, `SSID`, `__Secure-1PSID`, etc.) — extract via Chrome DevTools Protocol, not `document.cookie`.
 
 ## Enterprise vs Standard Differences
 
@@ -203,15 +155,15 @@ Or configure in your AI tool's MCP settings (e.g. `.claude/claude_desktop_config
 
 ### "Authentication expired"
 
-Re-extract cookies from your browser. Enterprise cookies rotate frequently — the CSRF token and session ID are refreshed automatically, but the base cookies must be current.
+Run `nlm login` again. Enterprise cookies rotate periodically — CSRF tokens and session IDs refresh automatically, but base cookies require re-login when expired.
 
 ### "API error (code 3)"
 
-Invalid request parameters. Ensure `NOTEBOOKLM_PROJECT_ID` is set correctly. Find it in the URL when viewing any notebook: `?project=XXXXX`.
+Invalid parameters. Ensure `NOTEBOOKLM_PROJECT_ID` is correct. Find it in the URL when viewing any notebook: `?project=XXXXX`.
 
 ### Empty notebook list
 
-- Verify you're using the correct Google account's cookies
+- Verify you logged in with the correct Google Workspace account via `nlm login`
 - Check that `NOTEBOOKLM_CID` matches the organization ID in the URL
 
 ### Studio content types not available
