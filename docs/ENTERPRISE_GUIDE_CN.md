@@ -93,43 +93,49 @@ nlm note delete <notebook-id> <note-id> --confirm
 
 ## MCP Server 配置
 
-### Claude Code / Claude Desktop
+`nlm login --url` 完成后，所有认证信息（Cookies、CSRF、Project ID、CID）都已保存在本地 profile 中。MCP Server 会自动读取，配置非常简单。
 
-在 MCP 配置文件中添加：
+### Claude Code
+
+在项目根目录创建 `.mcp.json`：
 
 ```json
 {
   "mcpServers": {
     "notebooklm": {
-      "command": "notebooklm-mcp",
-      "env": {
-        "NOTEBOOKLM_BASE_URL": "https://vertexaisearch.cloud.google.com",
-        "NOTEBOOKLM_PROJECT_ID": "你的 Project ID",
-        "NOTEBOOKLM_CID": "你的组织 CID"
-      }
+      "command": "notebooklm-mcp"
     }
   }
 }
 ```
 
-> MCP Server 启动时会自动从本地 profile 读取已保存的 Cookies（通过 `nlm login` 保存的），无需在配置中写入 Cookies。
+### Claude Desktop
 
-配置完成后，可以用自然语言操作 NotebookLM：
+编辑 `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）：
 
-- "列出我所有的 Notebook"
+```json
+{
+  "mcpServers": {
+    "notebooklm": {
+      "command": "notebooklm-mcp"
+    }
+  }
+}
+```
+
+### Cursor / Windsurf / 其他 MCP 工具
+
+在对应工具的 MCP 配置中添加同样的 JSON 即可。
+
+### 验证
+
+配置完成后重启 AI 工具，然后用自然语言测试：
+
+- "列出我所有的 NotebookLM notebooks"
 - "创建一个关于机器学习的 Notebook，添加这个 URL 作为来源"
 - "根据 Notebook 内容生成一期播客"
 
-### 手动配置（可选）
-
-如果不想用 `nlm login --url`，也可以通过环境变量手动配置：
-
-```bash
-export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
-export NOTEBOOKLM_CID="79e69e06-..."        # 组织 ID
-export NOTEBOOKLM_PROJECT_ID="77341597043"  # Project ID
-nlm login                                    # 仍需登录提取 Cookies
-```
+> 不需要配置任何环境变量。所有企业配置从 `nlm login --url` 保存的 profile 中自动加载。
 
 ## 企业版与标准版差异
 

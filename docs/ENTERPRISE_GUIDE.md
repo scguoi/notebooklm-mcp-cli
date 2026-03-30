@@ -86,35 +86,47 @@ nlm note delete <notebook-id> <note-id> --confirm
 
 ## MCP Server Configuration
 
-Configure in your AI tool's MCP settings:
+After `nlm login --url`, all auth and enterprise config is saved locally. The MCP server reads it automatically — no env vars needed.
+
+### Claude Code
+
+Create `.mcp.json` in your project root:
 
 ```json
 {
   "mcpServers": {
     "notebooklm": {
-      "command": "notebooklm-mcp",
-      "env": {
-        "NOTEBOOKLM_BASE_URL": "https://vertexaisearch.cloud.google.com",
-        "NOTEBOOKLM_PROJECT_ID": "<your-project-id>",
-        "NOTEBOOKLM_CID": "<your-customer-id>"
-      }
+      "command": "notebooklm-mcp"
     }
   }
 }
 ```
 
-> The MCP server reads saved cookies from the local profile (created by `nlm login`). No need to include cookies in the config.
+### Claude Desktop
 
-### Manual Configuration (Optional)
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
-If you prefer not to use `nlm login --url`, you can set environment variables manually:
-
-```bash
-export NOTEBOOKLM_BASE_URL="https://vertexaisearch.cloud.google.com"
-export NOTEBOOKLM_CID="79e69e06-..."        # Org ID
-export NOTEBOOKLM_PROJECT_ID="77341597043"  # Project ID
-nlm login                                    # Still needed to extract cookies
+```json
+{
+  "mcpServers": {
+    "notebooklm": {
+      "command": "notebooklm-mcp"
+    }
+  }
+}
 ```
+
+### Cursor / Windsurf / Other MCP Tools
+
+Add the same JSON to the tool's MCP configuration.
+
+### Verify
+
+Restart your AI tool after configuration, then test with natural language:
+
+- "List my NotebookLM notebooks"
+- "Create a notebook about machine learning and add this URL as a source"
+- "Generate a podcast from the notebook"
 
 ## Enterprise vs Standard Differences
 
