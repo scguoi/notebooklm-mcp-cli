@@ -775,10 +775,12 @@ class BaseClient:
             if sid_match:
                 self._session_id = sid_match.group(1)
 
-            # Extract build label (cfb2h) - keeps bl param current
+            # Extract build label (cfb2h) - keeps bl param current.
+            # Reset to empty if not found so the variant fallback is used.
+            # This prevents a stale/wrong bl (e.g. from the Gemini Enterprise
+            # shell page saved during login) from persisting.
             bl_match = re.search(r'"cfb2h":"([^"]+)"', html)
-            if bl_match:
-                self._bl = bl_match.group(1)
+            self._bl = bl_match.group(1) if bl_match else ""
 
             # Extract project ID for enterprise (used by Discovery Engine upload)
             if v.is_enterprise:
