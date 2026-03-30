@@ -380,6 +380,9 @@ class AuthManager:
         email: str | None = None,
         force: bool = False,
         build_label: str | None = None,
+        base_url: str | None = None,
+        project_id: str | None = None,
+        cid: str | None = None,
     ) -> Profile:
         """Save credentials to the current profile.
 
@@ -424,6 +427,13 @@ class AuthManager:
             "build_label": build_label,
             "last_validated": datetime.now().isoformat(),
         }
+        # Enterprise-specific fields (auto-extracted during login)
+        if base_url:
+            metadata["base_url"] = base_url
+        if project_id:
+            metadata["project_id"] = project_id
+        if cid:
+            metadata["cid"] = cid
         self.metadata_file.write_text(
             json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8"
         )

@@ -64,7 +64,8 @@ def _get_notebooklm_url() -> str:
 
     For enterprise, navigates to the Gemini Enterprise shell URL with org context
     (e.g. .../home/cid/<customer_id>) so the user lands in the correct org.
-    Falls back to the NotebookLM iframe URL if no CID is configured.
+    Falls back to the generic enterprise home if no CID is configured yet
+    (first-time login — CID will be auto-extracted from the URL after login).
     """
     import os
 
@@ -74,8 +75,10 @@ def _get_notebooklm_url() -> str:
     if v.is_enterprise:
         cid = os.environ.get("NOTEBOOKLM_CID", "")
         if cid:
-            # Navigate to Gemini Enterprise shell with org context
             return f"{v.base_url}/u/0/home/cid/{cid}?hl=en_US"
+        # No CID yet — navigate to generic enterprise home; after login
+        # the server will redirect to the user's org URL containing the CID.
+        return f"{v.base_url}/u/0/"
     return f"{v.base_url}{v.auth_page_path}"
 
 
@@ -966,13 +969,32 @@ def extract_cookies_from_page(
     email = extract_email(html)
     build_label = extract_build_label(html)
 
-    return {
+    result = {
         "cookies": cookies,
         "csrf_token": csrf_token,
         "session_id": session_id,
         "email": email,
         "build_label": build_label,
     }
+
+    # Auto-extract enterprise IDs (CID from URL, PROJECT_ID from page)
+    current_url = get_current_url(ws_url)
+    if "vertexaisearch.cloud.google.com" in current_url:
+        import re as _re
+
+        cid_match = _re.search(r"/cid/([\w-]{36})", current_url)
+        if cid_match:
+            result["cid"] = cid_match.group(1)
+
+        proj_match = _re.search(r"project=(\d+)", current_url) or _re.search(
+            r"project=(\d+)", html
+        )
+        if proj_match:
+            result["project_id"] = proj_match.group(1)
+
+        result["base_url"] = "https://vertexaisearch.cloud.google.com"
+
+    return result
 
 
 # =============================================================================

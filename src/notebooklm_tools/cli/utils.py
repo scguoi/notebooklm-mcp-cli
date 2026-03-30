@@ -31,6 +31,35 @@ def make_console(**kwargs) -> "Console":
 console = make_console()
 
 
+def _inject_enterprise_env(manager: AuthManager) -> None:
+    """Inject enterprise config from profile metadata into environment variables.
+
+    When nlm login auto-discovers enterprise IDs (base_url, project_id, cid),
+    they are saved in the profile metadata. This function sets the corresponding
+    env vars so that get_variant(), get_project_id(), etc. pick them up without
+    the user having to export them manually.
+
+    Env vars already set by the user take precedence (not overwritten).
+    """
+    try:
+        metadata_file = manager.metadata_file
+        if not metadata_file.exists():
+            return
+        import json as _json
+
+        metadata = _json.loads(metadata_file.read_text(encoding="utf-8"))
+        for env_key, meta_key in [
+            ("NOTEBOOKLM_BASE_URL", "base_url"),
+            ("NOTEBOOKLM_PROJECT_ID", "project_id"),
+            ("NOTEBOOKLM_CID", "cid"),
+        ]:
+            value = metadata.get(meta_key)
+            if value and not os.environ.get(env_key):
+                os.environ[env_key] = value
+    except Exception:
+        pass  # Non-critical — user can still set env vars manually
+
+
 def get_client(profile: str | None = None) -> NotebookLMClient:
     """Get an authenticated NotebookLM client.
 
@@ -56,6 +85,12 @@ def get_client(profile: str | None = None) -> NotebookLMClient:
 
     try:
         p = manager.load_profile()
+
+        # Inject enterprise config from profile into env vars if not already set.
+        # This allows nlm login to auto-discover enterprise IDs so the user
+        # doesn't need to set NOTEBOOKLM_PROJECT_ID / CID manually.
+        _inject_enterprise_env(manager)
+
         return NotebookLMClient(
             cookies=p.cookies,
             csrf_token=p.csrf_token or "",

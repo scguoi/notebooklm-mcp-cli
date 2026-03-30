@@ -305,7 +305,7 @@ def login_callback(
         email = result.get("email", "")
         build_label = result.get("build_label", "")
 
-        # Save to profile
+        # Save to profile (includes enterprise config if auto-extracted)
         auth.save_profile(
             cookies=cookies,
             csrf_token=csrf_token,
@@ -313,6 +313,9 @@ def login_callback(
             email=email,
             force=force,
             build_label=build_label,
+            base_url=result.get("base_url"),
+            project_id=result.get("project_id"),
+            cid=result.get("cid"),
         )
 
         # Close builtin auth Chrome to release profile lock (enables headless auth later)

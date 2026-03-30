@@ -7,7 +7,7 @@ import logging
 import os
 import threading
 
-from notebooklm_tools.core.auth import load_cached_tokens
+from notebooklm_tools.core.auth import AuthManager, load_cached_tokens
 from notebooklm_tools.core.client import NotebookLMClient
 from notebooklm_tools.core.utils import extract_cookies_from_chrome_export
 
@@ -80,6 +80,8 @@ def get_client() -> NotebookLMClient:
                 csrf_token = csrf_token or cached.csrf_token
                 session_id = session_id or cached.session_id
                 build_label = cached.build_label or ""
+                # Inject enterprise config from profile metadata
+                _inject_enterprise_env_from_profile()
             else:
                 raise ValueError(
                     "No authentication found. Either:\n"
@@ -94,6 +96,32 @@ def get_client() -> NotebookLMClient:
             build_label=build_label,
         )
     return _client
+
+
+def _inject_enterprise_env_from_profile() -> None:
+    """Inject enterprise config from profile metadata into env vars.
+
+    Reads base_url, project_id, cid from the profile's metadata.json and sets
+    the corresponding NOTEBOOKLM_* env vars if not already set by the user.
+    """
+    try:
+        from notebooklm_tools.utils.config import get_config
+
+        profile_name = get_config().auth.default_profile
+        manager = AuthManager(profile_name)
+        if not manager.metadata_file.exists():
+            return
+        metadata = json.loads(manager.metadata_file.read_text(encoding="utf-8"))
+        for env_key, meta_key in [
+            ("NOTEBOOKLM_BASE_URL", "base_url"),
+            ("NOTEBOOKLM_PROJECT_ID", "project_id"),
+            ("NOTEBOOKLM_CID", "cid"),
+        ]:
+            value = metadata.get(meta_key)
+            if value and not os.environ.get(env_key):
+                os.environ[env_key] = value
+    except Exception:
+        pass
 
 
 def reset_client() -> None:
