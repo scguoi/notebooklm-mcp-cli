@@ -59,7 +59,27 @@ __all__ = [
 
 CDP_DEFAULT_PORT = 9222
 CDP_PORT_RANGE = range(9222, 9232)  # Ports to scan for existing/available
-NOTEBOOKLM_URL = f"{get_base_url()}/"
+def _get_notebooklm_url() -> str:
+    """Get the URL to navigate to for login/CSRF extraction.
+
+    For enterprise, navigates to the Gemini Enterprise shell URL with org context
+    (e.g. .../home/cid/<customer_id>) so the user lands in the correct org.
+    Falls back to the NotebookLM iframe URL if no CID is configured.
+    """
+    import os
+
+    from notebooklm_tools.core.variant import get_variant
+
+    v = get_variant()
+    if v.is_enterprise:
+        cid = os.environ.get("NOTEBOOKLM_CID", "")
+        if cid:
+            # Navigate to Gemini Enterprise shell with org context
+            return f"{v.base_url}/u/0/home/cid/{cid}?hl=en_US"
+    return f"{v.base_url}{v.auth_page_path}"
+
+
+NOTEBOOKLM_URL = f"{get_base_url()}/"  # Legacy constant; prefer _get_notebooklm_url()
 
 import logging as _logging  # noqa: E402
 
@@ -574,7 +594,7 @@ def find_or_create_notebooklm_page_by_cdp_url(cdp_http_url: str) -> dict | None:
             return page
 
     try:
-        encoded_url = quote(NOTEBOOKLM_URL, safe="")
+        encoded_url = quote(_get_notebooklm_url(), safe="")
         response = httpx_client.put(
             f"{cdp_http_url}/json/new?{encoded_url}",
             timeout=15,
@@ -588,7 +608,7 @@ def find_or_create_notebooklm_page_by_cdp_url(cdp_http_url: str) -> dict | None:
             page = response.json()
             ws_url = _normalize_ws_url(page.get("webSocketDebuggerUrl"))
             if ws_url:
-                navigate_to_url(ws_url, NOTEBOOKLM_URL)
+                navigate_to_url(ws_url, _get_notebooklm_url())
             return page
 
         return None
@@ -701,7 +721,11 @@ def navigate_to_url(ws_url: str, url: str) -> None:
 
 def _is_notebooklm_url(url: str) -> bool:
     """Check if a URL belongs to any NotebookLM domain (personal or enterprise)."""
-    return "notebooklm.google.com" in url or "notebooklm.cloud.google.com" in url
+    return (
+        "notebooklm.google.com" in url
+        or "notebooklm.cloud.google.com" in url
+        or "vertexaisearch.cloud.google.com" in url
+    )
 
 
 def is_logged_in(url: str) -> bool:
@@ -904,7 +928,7 @@ def extract_cookies_from_page(
     # Navigate to NotebookLM if needed
     current_url = page.get("url", "")
     if not _is_notebooklm_url(current_url):
-        navigate_to_url(ws_url, NOTEBOOKLM_URL)
+        navigate_to_url(ws_url, _get_notebooklm_url())
 
     # Check login status
     current_url = get_current_url(ws_url)

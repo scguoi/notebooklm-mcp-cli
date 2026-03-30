@@ -25,6 +25,7 @@ from . import constants
 from .base import SOURCE_ADD_TIMEOUT, BaseClient
 from .exceptions import FileUploadError, FileValidationError
 from .retry import execute_with_retry
+from .variant import get_variant, notebook_resource, resource_prefix, source_resource, wrap_70000
 
 
 class SourceMixin(BaseClient):
@@ -134,19 +135,27 @@ class SourceMixin(BaseClient):
         Returns:
             Dict with source_id and title on success, None on failure
         """
-        params = [None, [source_id], [[[new_title]]]]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [
+                [None, new_title, wrap_70000(source_resource(notebook_id, source_id))],
+                [["title"]],
+            ]
+        else:
+            params = [None, [source_id], [[[new_title]]]]
         path = f"/notebook/{notebook_id}"
         result = self._call_rpc(self.RPC_RENAME_SOURCE, params, path)
 
         if result and isinstance(result, list) and len(result) > 0:
-            source_data = result[0]
+            # Enterprise returns flat [[id], title, ...], standard wraps [[[id], title, ...]]
+            source_data = result[0] if isinstance(result[0], list) and isinstance(result[0][0], list) else result
             if isinstance(source_data, list) and len(source_data) >= 2:
                 returned_id = source_data[0][0] if source_data[0] else source_id
                 returned_title = source_data[1] if len(source_data) > 1 else new_title
                 return {"id": returned_id, "title": returned_title}
         return None
 
-    def delete_source(self, source_id: str) -> bool:
+    def delete_source(self, source_id: str, notebook_id: str | None = None) -> bool:
         """Delete a source from a notebook permanently.
 
         WARNING: This action is IRREVERSIBLE. The source will be permanently
@@ -154,20 +163,22 @@ class SourceMixin(BaseClient):
 
         Args:
             source_id: The source UUID to delete
+            notebook_id: Required for enterprise variant
 
         Returns:
             True on success, False on failure
         """
-        # Delete source params: [[["source_id"]], [2]]
-        # Note: Extra nesting compared to delete_notebook
-        params = [[[source_id]], [2]]
+        v = get_variant()
+        if v.is_enterprise:
+            nb_res = notebook_resource(notebook_id or "")
+            params = [nb_res, [source_resource(notebook_id or "", source_id)]]
+        else:
+            params = [[[source_id]], [2]]
 
         result = self._call_rpc(self.RPC_DELETE_SOURCE, params)
-
-        # Response is typically [] on success
         return result is not None
 
-    def delete_sources(self, source_ids: list[str]) -> bool:
+    def delete_sources(self, source_ids: list[str], notebook_id: str | None = None) -> bool:
         """Delete multiple sources from a notebook in a single request.
 
         WARNING: This action is IRREVERSIBLE. All specified sources will be
@@ -175,16 +186,20 @@ class SourceMixin(BaseClient):
 
         Args:
             source_ids: List of source UUIDs to delete
+            notebook_id: Required for enterprise variant
 
         Returns:
             True on success, False on failure
         """
-        # Batch delete params: [[["id1"], ["id2"], ...], [2]]
-        params = [[[sid] for sid in source_ids], [2]]
+        v = get_variant()
+        if v.is_enterprise:
+            nb_id = notebook_id or ""
+            nb_res = notebook_resource(nb_id)
+            params = [nb_res, [source_resource(nb_id, sid) for sid in source_ids]]
+        else:
+            params = [[[sid] for sid in source_ids], [2]]
 
         result = self._call_rpc(self.RPC_DELETE_SOURCE, params)
-
-        # Response is typically [] on success
         return result is not None
 
     def get_notebook_sources_with_types(self, notebook_id: str) -> list[dict]:
@@ -274,18 +289,20 @@ class SourceMixin(BaseClient):
         is_youtube = "youtube.com" in url.lower() or "youtu.be" in url.lower()
 
         if is_youtube:
-            # YouTube: [null, null, null, null, null, null, null, [url], null, null, 1]
             source_data = [None, None, None, None, None, None, None, [url], None, None, 1]
         else:
-            # Regular website: [null, null, [url], null, null, null, null, null, null, null, 1]
             source_data = [None, None, [url], None, None, None, None, None, None, None, 1]
 
-        params = [
-            [source_data],
-            notebook_id,
-            [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]],
-        ]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id), [source_data]]
+        else:
+            params = [
+                [source_data],
+                notebook_id,
+                [2],
+                [1, None, None, None, None, None, None, None, None, None, [1]],
+            ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
@@ -342,12 +359,16 @@ class SourceMixin(BaseClient):
                 source_data = [None, None, [url], None, None, None, None, None, None, None, 1]
             source_data_list.append(source_data)
 
-        params = [
-            source_data_list,
-            notebook_id,
-            [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]],
-        ]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id), [source_data_list]]
+        else:
+            params = [
+                source_data_list,
+                notebook_id,
+                [2],
+                [1, None, None, None, None, None, None, None, None, None, [1]],
+            ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
@@ -403,12 +424,17 @@ class SourceMixin(BaseClient):
         """
         # Text source params structure:
         source_data = [None, [title, text], None, 2, None, None, None, None, None, None, 1]
-        params = [
-            [source_data],
-            notebook_id,
-            [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]],
-        ]
+
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id), [source_data]]
+        else:
+            params = [
+                [source_data],
+                notebook_id,
+                [2],
+                [1, None, None, None, None, None, None, None, None, None, [1]],
+            ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
@@ -456,23 +482,19 @@ class SourceMixin(BaseClient):
         """
         source_data = [
             [document_id, mime_type, 1, title],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            1,
+            None, None, None, None, None, None, None, None, None, 1,
         ]
-        params = [
-            [source_data],
-            notebook_id,
-            [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]],
-        ]
+
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id), [source_data]]
+        else:
+            params = [
+                [source_data],
+                notebook_id,
+                [2],
+                [1, None, None, None, None, None, None, None, None, None, [1]],
+            ]
         source_path = f"/notebook/{notebook_id}"
 
         try:
@@ -549,7 +571,8 @@ class SourceMixin(BaseClient):
     ) -> str:
         """Start a resumable upload session and get the upload URL.
 
-        Step 2 of the resumable upload protocol.
+        Step 2 of the resumable upload protocol. For enterprise, uses the
+        Discovery Engine API instead of the standard upload endpoint.
 
         Args:
             notebook_id: The notebook ID
@@ -564,6 +587,12 @@ class SourceMixin(BaseClient):
             FileUploadError: If starting the upload session fails
         """
         import json
+
+        from .variant import get_variant
+
+        v = get_variant()
+        if v.is_enterprise:
+            return self._start_enterprise_upload(notebook_id, filename, file_size, source_id)
 
         url = f"{self._get_upload_url()}?authuser=0"
         cookies = self._get_httpx_cookies()
@@ -600,6 +629,74 @@ class SourceMixin(BaseClient):
             upload_url = response.headers.get("x-goog-upload-url")
             if not upload_url:
                 raise FileUploadError(filename, "Failed to get upload URL from response headers")
+
+            return upload_url
+
+    def _start_enterprise_upload(
+        self,
+        notebook_id: str,
+        filename: str,
+        file_size: int,
+        source_id: str,
+    ) -> str:
+        """Start a resumable upload via Discovery Engine API (enterprise).
+
+        Enterprise NotebookLM uses a different upload endpoint on a separate
+        domain (discoveryengine.clients6.google.com).
+        """
+        import json
+
+        from .variant import get_project_id, get_variant
+
+        v = get_variant()
+        project_id = get_project_id() or getattr(self, "_project_id", "")
+        if not project_id:
+            raise FileUploadError(
+                filename,
+                "NOTEBOOKLM_PROJECT_ID env var required for enterprise file upload. "
+                "Find it in the NotebookLM Enterprise URL (project=XXXXX).",
+            )
+
+        url = (
+            f"https://{v.upload_domain}/upload/v1alpha/projects/{project_id}"
+            f"/locations/global/notebooks/{notebook_id}/sources:uploadFile"
+        )
+
+        cookies = self._get_httpx_cookies()
+        headers = {
+            "Accept": "*/*",
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "Origin": self._get_base_url(),
+            "Referer": f"{self._get_base_url()}/",
+            "x-goog-authuser": "0",
+            "x-goog-upload-command": "start",
+            "x-goog-upload-header-content-length": str(file_size),
+            "x-goog-upload-protocol": "resumable",
+        }
+
+        body = json.dumps(
+            {
+                "PROJECT_ID": notebook_id,
+                "SOURCE_NAME": filename,
+                "SOURCE_ID": source_id,
+            },
+            ensure_ascii=False,
+        )
+
+        with httpx.Client(timeout=60.0, cookies=cookies) as client:
+
+            def _do_request():
+                resp = client.post(url, headers=headers, content=body)
+                resp.raise_for_status()
+                return resp
+
+            response = execute_with_retry(_do_request)
+
+            upload_url = response.headers.get("x-goog-upload-url")
+            if not upload_url:
+                raise FileUploadError(
+                    filename, "Failed to get upload URL from Discovery Engine API"
+                )
 
             return upload_url
 
@@ -713,8 +810,15 @@ class SourceMixin(BaseClient):
                 f"Supported types: {', '.join(sorted(supported_extensions))}"
             )
 
-        # Step 1: Register source intent → get SOURCE_ID
-        source_id = self._register_file_source(notebook_id, filename)
+        # Enterprise uses 2-step upload (no registration needed).
+        # Standard uses 3-step: register → init → stream.
+        v = get_variant()
+        if v.is_enterprise:
+            import uuid
+            source_id = str(uuid.uuid4())
+        else:
+            # Step 1: Register source intent → get SOURCE_ID
+            source_id = self._register_file_source(notebook_id, filename)
 
         # Step 2: Start resumable upload → get upload URL
         upload_url = self._start_resumable_upload(notebook_id, filename, file_size, source_id)
@@ -751,7 +855,7 @@ class SourceMixin(BaseClient):
             "keywords": keywords,
         }
 
-    def get_source_fulltext(self, source_id: str) -> dict[str, Any]:
+    def get_source_fulltext(self, source_id: str, notebook_id: str | None = None) -> dict[str, Any]:
         """Get the full text content of a source.
 
         Returns the raw text content that was indexed from the source,
@@ -759,12 +863,16 @@ class SourceMixin(BaseClient):
 
         Args:
             source_id: The source UUID
+            notebook_id: Required for enterprise variant
 
         Returns:
             Dict with content, title, source_type, and char_count
         """
-        # The hizoJc RPC returns source details including full text
-        params = [[source_id], [2], [2]]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [source_resource(notebook_id or "", source_id), [[source_id]]]
+        else:
+            params = [[source_id], [2], [2]]
         result = self._call_rpc(self.RPC_GET_SOURCE, params, "/")
 
         content = ""

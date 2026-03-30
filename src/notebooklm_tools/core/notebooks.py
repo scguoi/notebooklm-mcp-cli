@@ -17,6 +17,7 @@ from . import constants
 from .base import BaseClient
 from .data_types import Notebook
 from .utils import parse_timestamp
+from .variant import get_variant, notebook_resource, resource_prefix, wrap_70000
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,11 @@ class NotebookMixin(BaseClient):
 
     def list_notebooks(self, debug: bool = False) -> list[Notebook]:
         """List all notebooks."""
-        # [null, 1, null, [2]] - params for list notebooks
-        params = [None, 1, None, [2]]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [resource_prefix(), None, None, 1]
+        else:
+            params = [None, 1, None, [2]]
 
         result = self._call_rpc(self.RPC_LIST_NOTEBOOKS, params)
 
@@ -127,16 +131,26 @@ class NotebookMixin(BaseClient):
 
     def get_notebook(self, notebook_id: str) -> dict | None:
         """Get notebook details."""
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id)]
+        else:
+            params = [notebook_id, None, [2], None, 0]
         return self._call_rpc(
             self.RPC_GET_NOTEBOOK,
-            [notebook_id, None, [2], None, 0],
+            params,
             f"/notebook/{notebook_id}",
         )
 
     def get_notebook_summary(self, notebook_id: str) -> dict[str, Any]:
         """Get AI-generated summary and suggested topics for a notebook."""
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id), [2]]
+        else:
+            params = [notebook_id, [2]]
         result = self._call_rpc(
-            self.RPC_GET_SUMMARY, [notebook_id, [2]], f"/notebook/{notebook_id}"
+            self.RPC_GET_SUMMARY, params, f"/notebook/{notebook_id}"
         )
         summary = ""
         suggested_topics = []
@@ -167,13 +181,20 @@ class NotebookMixin(BaseClient):
 
     def create_notebook(self, title: str = "") -> Notebook | None:
         """Create a new notebook."""
-        params = [
-            title,
-            None,
-            None,
-            [2],
-            [1, None, None, None, None, None, None, None, None, None, [1]],
-        ]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [
+                resource_prefix(),
+                [title, None, None, None, None, [None, None, None, None, None, None, 1]],
+            ]
+        else:
+            params = [
+                title,
+                None,
+                None,
+                [2],
+                [1, None, None, None, None, None, None, None, None, None, [1]],
+            ]
         result = self._call_rpc(self.RPC_CREATE_NOTEBOOK, params)
         if result and isinstance(result, list) and len(result) >= 3:
             notebook_id = result[2]
@@ -188,7 +209,14 @@ class NotebookMixin(BaseClient):
 
     def rename_notebook(self, notebook_id: str, new_title: str) -> bool:
         """Rename a notebook."""
-        params = [notebook_id, [[None, None, None, [None, new_title]]]]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [
+                [new_title, wrap_70000(notebook_resource(notebook_id))],
+                [["title", "emoji"]],
+            ]
+        else:
+            params = [notebook_id, [[None, None, None, [None, new_title]]]]
         result = self._call_rpc(self.RPC_RENAME_NOTEBOOK, params, f"/notebook/{notebook_id}")
         return result is not None
 
@@ -218,7 +246,17 @@ class NotebookMixin(BaseClient):
             goal_setting = [goal_code]
 
         chat_settings = [goal_setting, [length_code]]
-        params = [notebook_id, [[None, None, None, None, None, None, None, chat_settings]]]
+
+        v = get_variant()
+        if v.is_enterprise:
+            # Enterprise uses aja7m with field selector [["advanced_settings"]]
+            params = [
+                [None, None, None, None, None, None, None, chat_settings,
+                 wrap_70000(notebook_resource(notebook_id))],
+                [["advanced_settings"]],
+            ]
+        else:
+            params = [notebook_id, [[None, None, None, None, None, None, None, chat_settings]]]
         result = self._call_rpc(self.RPC_RENAME_NOTEBOOK, params, f"/notebook/{notebook_id}")
 
         if result:
@@ -250,7 +288,12 @@ class NotebookMixin(BaseClient):
         Returns:
             True on success, False on failure
         """
-        params = [[notebook_id], [2]]
+        v = get_variant()
+        if v.is_enterprise:
+            rp = resource_prefix()
+            params = [rp, [notebook_resource(notebook_id)]]
+        else:
+            params = [[notebook_id], [2]]
         result = self._call_rpc(self.RPC_DELETE_NOTEBOOK, params)
 
         return result is not None

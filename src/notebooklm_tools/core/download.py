@@ -170,17 +170,24 @@ class DownloadMixin(BaseClient):
 
     def _list_raw(self, notebook_id: str) -> list[Any]:
         """Get raw artifact list for parsing download URLs."""
-        # Poll params: [[2], notebook_id, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"']
-        params = [[2], notebook_id, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"']
-        body = self._build_request_body(self.RPC_POLL_STUDIO, params)
-        url = self._build_url(self.RPC_POLL_STUDIO, f"/notebook/{notebook_id}")
+        from .variant import get_variant, notebook_resource, translate_rpc_id
+
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id)]
+        else:
+            params = [[2], notebook_id, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"']
+
+        wire_id = translate_rpc_id(self.RPC_POLL_STUDIO)
+        body = self._build_request_body(wire_id, params)
+        url = self._build_url(wire_id, f"/notebook/{notebook_id}")
 
         client = self._get_client()
         response = client.post(url, content=body)
         response.raise_for_status()
 
         parsed = self._parse_response(response.text)
-        result = self._extract_rpc_result(parsed, self.RPC_POLL_STUDIO)
+        result = self._extract_rpc_result(parsed, wire_id)
 
         if result and isinstance(result, list) and len(result) > 0:
             # Response is an array of artifacts, possibly wrapped

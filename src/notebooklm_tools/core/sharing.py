@@ -10,6 +10,7 @@ This mixin provides sharing-related operations:
 from . import constants
 from .base import BaseClient
 from .data_types import Collaborator, ShareStatus
+from .variant import get_customer_id, get_variant, notebook_resource, wrap_70001
 
 
 class SharingMixin(BaseClient):
@@ -29,7 +30,11 @@ class SharingMixin(BaseClient):
         Returns:
             ShareStatus with collaborators list, public access status, and link
         """
-        params = [notebook_id, [2]]
+        v = get_variant()
+        if v.is_enterprise:
+            params = [notebook_resource(notebook_id)]
+        else:
+            params = [notebook_id, [2]]
         result = self._call_rpc(self.RPC_GET_SHARE_STATUS, params)
 
         # Parse collaborators from response
@@ -81,7 +86,8 @@ class SharingMixin(BaseClient):
 
         # Construct public link if public
         if is_public:
-            public_link = f"{self._get_base_url()}/notebook/{notebook_id}"
+            vv = get_variant()
+            public_link = f"{vv.base_url}{vv.path_prefix}notebook/{notebook_id}"
 
         access_level = "public" if is_public else "restricted"
 
@@ -111,7 +117,8 @@ class SharingMixin(BaseClient):
         self._call_rpc(self.RPC_SHARE_NOTEBOOK, params)
 
         if is_public:
-            return f"{self._get_base_url()}/notebook/{notebook_id}"
+            vv = get_variant()
+            return f"{vv.base_url}{vv.path_prefix}notebook/{notebook_id}"
         return None
 
     def add_collaborator(
@@ -139,15 +146,27 @@ class SharingMixin(BaseClient):
         if role_code == constants.SHARE_ROLE_OWNER:
             raise ValueError("Cannot add collaborator as owner")
 
-        # Payload: [[[notebook_id, [[email, null, role_code]], null, [notify_flag, message]]], 1, null, [2]]
         notify_flag = 0 if notify else 1  # 0 = notify, 1 = don't notify
 
-        params = [
-            [[notebook_id, [[email, None, role_code]], None, [notify_flag, message]]],
-            1,
-            None,
-            [2],
-        ]
+        v = get_variant()
+        if v.is_enterprise:
+            # Enterprise: ["{rp}/notebooks/{nb_id}", [[email, null, role_code]], notify, [0, ""], {"70001": "{cid}"}]
+            cid = get_customer_id()
+            params = [
+                notebook_resource(notebook_id),
+                [[email, None, role_code]],
+                1,
+                [notify_flag, message],
+            ]
+            if cid:
+                params.append(wrap_70001(cid))
+        else:
+            params = [
+                [[notebook_id, [[email, None, role_code]], None, [notify_flag, message]]],
+                1,
+                None,
+                [2],
+            ]
 
         result = self._call_rpc(self.RPC_SHARE_NOTEBOOK, params)
 
@@ -191,7 +210,19 @@ class SharingMixin(BaseClient):
 
         notify_flag = 0 if notify else 1  # 0 = notify, 1 = don't notify
 
-        params = [[[notebook_id, email_items, None, [notify_flag, message]]], 1, None, [2]]
+        v = get_variant()
+        if v.is_enterprise:
+            cid = get_customer_id()
+            params = [
+                notebook_resource(notebook_id),
+                email_items,
+                1,
+                [notify_flag, message],
+            ]
+            if cid:
+                params.append(wrap_70001(cid))
+        else:
+            params = [[[notebook_id, email_items, None, [notify_flag, message]]], 1, None, [2]]
 
         result = self._call_rpc(self.RPC_SHARE_NOTEBOOK, params)
 
