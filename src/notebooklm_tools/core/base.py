@@ -294,13 +294,11 @@ class BaseClient:
         # Request counter for _reqid parameter (required for query endpoint)
         self._reqid_counter = random.randint(100000, 999999)
 
-        # Refresh auth tokens if CSRF is missing, or if enterprise variant
-        # needs a session ID (f.sid). Enterprise RPCs return empty data without it.
-        needs_refresh = not self.csrf_token
-        if not needs_refresh and not self._session_id:
-            v = get_variant()
-            needs_refresh = v.is_enterprise
-        if needs_refresh:
+        # Refresh auth tokens if CSRF is missing, or if running enterprise.
+        # Enterprise always refreshes on init to extract session_id (f.sid)
+        # and project_id — both required for API calls to succeed.
+        v = get_variant()
+        if not self.csrf_token or v.is_enterprise:
             self._refresh_auth_tokens()
 
     def __enter__(self):
@@ -736,6 +734,16 @@ class BaseClient:
             cookies=cookies, headers=headers, follow_redirects=True, timeout=15.0
         ) as client:
             v = get_variant()
+
+            # Enterprise auth page requires project= param. Without it, the
+            # server redirects to a help page. Skip CSRF refresh gracefully
+            # if project_id is not yet available (will be set during login).
+            if v.is_enterprise and not os.environ.get("NOTEBOOKLM_PROJECT_ID"):
+                pid = getattr(self, "_project_id", "")
+                if not pid:
+                    logger.debug("Enterprise CSRF refresh skipped: no project_id available yet")
+                    return
+
             response = client.get(f"{self._get_base_url()}{v.auth_page_path}")
 
             # Check if redirected to login (cookies expired)
@@ -782,11 +790,14 @@ class BaseClient:
             bl_match = re.search(r'"cfb2h":"([^"]+)"', html)
             self._bl = bl_match.group(1) if bl_match else ""
 
-            # Extract project ID for enterprise (used by Discovery Engine upload)
+            # Extract project ID for enterprise and sync to env var so that
+            # resource_prefix() / get_project_id() pick it up globally.
             if v.is_enterprise:
                 proj_match = re.search(r"project=(\d+)", html)
                 if proj_match:
                     self._project_id = proj_match.group(1)
+                    if not os.environ.get("NOTEBOOKLM_PROJECT_ID"):
+                        os.environ["NOTEBOOKLM_PROJECT_ID"] = self._project_id
 
             # Sync rotated cookies from the page fetch response.
             # The server may rotate cookies (SIDCC, __Secure-*PSIDCC, etc.)

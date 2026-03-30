@@ -982,17 +982,30 @@ def extract_cookies_from_page(
     if "vertexaisearch.cloud.google.com" in current_url:
         import re as _re
 
+        result["base_url"] = "https://vertexaisearch.cloud.google.com"
+
         cid_match = _re.search(r"/cid/([\w-]{36})", current_url)
         if cid_match:
             result["cid"] = cid_match.group(1)
 
+        # Try to find project_id in current page
         proj_match = _re.search(r"project=(\d+)", current_url) or _re.search(
             r"project=(\d+)", html
         )
+
+        # If not found, navigate to the NotebookLM agent page — the iframe
+        # URL or page HTML will contain project=<id>.
+        if not proj_match:
+            cid = result.get("cid") or os.environ.get("NOTEBOOKLM_CID", "")
+            if cid:
+                nb_agent_url = f"https://vertexaisearch.cloud.google.com/u/0/home/cid/{cid}/r/notebook"
+                navigate_to_url(ws_url, nb_agent_url)
+                time.sleep(3)  # Wait for iframe to load
+                agent_html = get_page_html(ws_url)
+                proj_match = _re.search(r"project=(\d+)", agent_html)
+
         if proj_match:
             result["project_id"] = proj_match.group(1)
-
-        result["base_url"] = "https://vertexaisearch.cloud.google.com"
 
     return result
 
